@@ -293,22 +293,24 @@ export function RolePermissionsEditor({
                 { label: "Edit", count: stats.write, tone: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
                 { label: "View", count: stats.read, tone: "bg-sky-500/10 text-sky-600 border-sky-500/20" },
                 { label: "Off", count: stats.off, tone: "bg-muted text-muted-foreground border-border" },
-                stats.custom > 0 && {
-                  label: "Custom",
-                  count: stats.custom,
-                  tone: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-                },
-              ]
-                .filter(Boolean)
-                .map((chip) => (
+                ...(stats.custom > 0
+                  ? [
+                      {
+                        label: "Custom",
+                        count: stats.custom,
+                        tone: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                      },
+                    ]
+                  : []),
+              ].map((chip) => (
                   <span
-                    key={chip!.label}
+                    key={chip.label}
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold",
-                      chip!.tone
+                      chip.tone
                     )}
                   >
-                    {chip!.count} {chip!.label}
+                    {chip.count} {chip.label}
                   </span>
                 ))}
             </div>

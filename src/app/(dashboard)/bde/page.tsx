@@ -1193,7 +1193,7 @@ export default function BDEManagementPage() {
         status: "present",
       }))
 
-      const merged = [...fromApi]
+      const merged: BdeShiftLog[] = [...fromApi]
       for (const row of fromStore) {
         if (!merged.some((m) => m.bdeId === row.bdeId && m.date === row.date)) {
           merged.push(row)

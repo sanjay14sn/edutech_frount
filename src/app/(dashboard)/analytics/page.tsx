@@ -135,7 +135,7 @@ export default function AnalyticsPage() {
                   <YAxis stroke="var(--muted-foreground)" fontSize={11} tickFormatter={formatCurrency} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
-                    formatter={(value: number) => [`₹${Number(value).toLocaleString()}`, ""]}
+                    formatter={(value) => [`₹${Number(value ?? 0).toLocaleString()}`, ""]}
                   />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                   <Area type="monotone" dataKey="Online" stroke="#3b82f6" fillOpacity={1} fill="url(#onlineGrad)" strokeWidth={2} name="Online fees" />
@@ -190,7 +190,7 @@ export default function AnalyticsPage() {
                   <YAxis stroke="var(--muted-foreground)" fontSize={11} domain={attendanceDomain} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
-                    formatter={(value: number) => [`${value}%`, "Attendance"]}
+                    formatter={(value) => [`${Number(value ?? 0)}%`, "Attendance"]}
                   />
                   <Bar dataKey="rate" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Attendance %" />
                 </BarChart>

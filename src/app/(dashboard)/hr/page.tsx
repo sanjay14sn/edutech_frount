@@ -229,9 +229,9 @@ export default function AdvancedHRPage() {
         setEmployees(overview.employees as Employee[])
         setPayrollList(overview.payroll)
         setCommissionRules(overview.commissionRules)
-        setClaims(overview.claims)
-        setSchedules(overview.schedules)
-        setVaultDocs(overview.vaultDocs)
+        setClaims(overview.claims as unknown as ReimbursementClaim[])
+        setSchedules(overview.schedules as ShiftSchedule[])
+        setVaultDocs(overview.vaultDocs as unknown as DocumentItem[])
         setDepartmentDistribution(overview.departmentDistribution)
         setLeaveUtilization(overview.leaveUtilization)
         setAlerts(overview.alerts)
@@ -811,7 +811,7 @@ export default function AdvancedHRPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)" }}
-                        formatter={(value: number) => formatCurrency(value)}
+                        formatter={(value) => formatCurrency(Number(value ?? 0))}
                       />
                     </PieChart>
                   </ResponsiveContainer>

@@ -469,6 +469,16 @@ export default function StudentsPage() {
     }
   }
 
+  const getStatusBadge = (status: Student["status"]) => (
+    <Badge
+      variant={
+        status === "active" ? "success" : status === "completed" ? "outline" : "warning"
+      }
+    >
+      {status === "active" ? "Active" : status === "completed" ? "Completed" : "On Hold"}
+    </Badge>
+  )
+
   const renderStatusToggle = (student: Student) => {
     const isActive = student.status === "active"
     const isUpdating = statusUpdatingId === student.id
