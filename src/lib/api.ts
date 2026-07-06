@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://api.erphubtechnologies.in:5002/api"
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.erphubtechnologies.in:5002/api"
 
 const TRANSIENT_HTTP = new Set([502, 503, 504])
 
