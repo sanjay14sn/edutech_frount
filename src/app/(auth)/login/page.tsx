@@ -91,83 +91,89 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-screen bg-zinc-950 text-zinc-100 overflow-hidden font-sans relative">
+    <div className="flex min-h-screen w-screen overflow-hidden font-sans relative">
+      {/* Mobile background overlay */}
       <Image
         src="/login-bg.jpg"
         alt=""
         fill
         priority
-        className="object-cover object-center lg:hidden opacity-30"
+        className="object-cover object-center lg:hidden opacity-20"
         sizes="100vw"
       />
-      <div className="absolute inset-0 bg-zinc-950/85 lg:hidden pointer-events-none" />
-      {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 border-r border-zinc-800/60 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/90 via-blue-600/90 to-cyan-500/90 lg:hidden pointer-events-none" />
+
+      {/* ─── Left branding panel ─── */}
+      <div className="hidden lg:flex lg:w-[52%] flex-col justify-between p-12 relative overflow-hidden">
         <Image
           src="/login-bg.jpg"
           alt=""
           fill
           priority
           className="object-cover object-center"
-          sizes="50vw"
+          sizes="52vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-zinc-950/55 via-zinc-900/45 to-black/65" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-zinc-950/20" />
-        <div className="absolute top-1/4 left-1/4 h-80 w-80 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 h-60 w-60 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-700/85 via-blue-600/80 to-cyan-600/75" />
+        <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-transparent" />
+        {/* Glow effects */}
+        <div className="absolute top-1/4 left-1/4 h-80 w-80 rounded-full bg-white/8 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/3 h-60 w-60 rounded-full bg-cyan-300/10 blur-3xl pointer-events-none" />
 
-        <div className="flex items-center gap-2.5 z-10 relative">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-black">
-            <Sparkles className="h-5 w-5" />
+        {/* Logo */}
+        <div className="flex items-center gap-3 z-10 relative">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 shadow-lg">
+            <Sparkles className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-zinc-100 to-zinc-400">
+          <span className="text-xl font-bold tracking-tight text-white">
             EduPlatform CRM
           </span>
         </div>
 
-        <div className="space-y-6 z-10 max-w-md relative">
-          <h1 className="text-4xl font-extrabold tracking-tight leading-tight text-zinc-100">
-            The Operating System for Modern Education.
+        {/* Hero content */}
+        <div className="space-y-5 z-10 max-w-lg relative">
+          <h1 className="text-4xl font-extrabold tracking-tight leading-[1.15] text-white drop-shadow-sm">
+            The Operating System for<br />Modern Education.
           </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed">
+          <p className="text-[15px] text-white/70 leading-relaxed max-w-md">
             Manage multi-tenant institutes, automate fee billing, run pipeline conversions, and track metrics on a unified dashboard.
           </p>
 
-          <div className="space-y-3 pt-4">
+          <div className="space-y-2.5 pt-3">
             {[
               { icon: Building2, label: "Multi-Institute Management", desc: "Register and manage unlimited training hubs" },
               { icon: ShieldCheck, label: "Role-Based Access Control", desc: "Super Admin → Owner → Trainer → Student" },
               { icon: CheckCircle2, label: "End-to-End CRM & LMS", desc: "Leads, batches, attendance, fees, and jobs" },
             ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 backdrop-blur-sm p-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800/80 border border-zinc-700/50">
-                  <Icon className="h-4 w-4 text-zinc-300" />
+              <div key={label} className="flex items-center gap-3 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 p-3.5 transition-colors hover:bg-white/15">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 border border-white/10">
+                  <Icon className="h-4.5 w-4.5 text-white/90" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-zinc-200">{label}</p>
-                  <p className="text-[10px] text-zinc-500">{desc}</p>
+                  <p className="text-[13px] font-semibold text-white">{label}</p>
+                  <p className="text-[11px] text-white/55">{desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="text-xs text-zinc-500 z-10 relative">
+        {/* Footer */}
+        <div className="text-xs text-white/40 z-10 relative">
           © 2026 EduPlatform ERP. Built for modern education businesses.
         </div>
       </div>
 
-      {/* Right form panel */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 relative bg-transparent lg:bg-zinc-950 z-10">
-        <div className="absolute top-10 right-10 h-40 w-40 rounded-full bg-primary/5 blur-3xl lg:hidden" />
+      {/* ─── Right form panel ─── */}
+      <div className="w-full lg:w-[48%] flex items-center justify-center p-6 md:p-12 relative z-10 lg:bg-white">
 
-        <div className="w-full max-w-sm space-y-6">
+        <div className="w-full max-w-[380px] space-y-7">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-black">
-              <Sparkles className="h-4 w-4" />
+          <div className="flex items-center gap-2.5 lg:hidden">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm border border-white/25">
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="text-base font-bold text-zinc-100">EduPlatform CRM</span>
+            <span className="text-base font-bold text-white">EduPlatform CRM</span>
           </div>
 
           <AnimatePresence mode="wait">
@@ -181,65 +187,69 @@ export default function LoginPage() {
                 className="space-y-6"
               >
                 <div className="space-y-1.5">
-                  <h2 className="text-2xl font-bold tracking-tight text-white">Sign In</h2>
-                  <p className="text-xs text-zinc-400">
+                  <h2 className="text-[26px] font-bold tracking-tight text-white lg:text-gray-900">Sign In</h2>
+                  <p className="text-sm text-white/60 lg:text-gray-500">
                     Enter your credentials to access the platform.
                   </p>
                 </div>
 
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300">Email Address</label>
+                    <label className="text-xs font-medium text-white/80 lg:text-gray-700">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-white/40 lg:text-gray-400" />
                       <input
                         type="email"
                         placeholder="you@example.com"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm rounded-xl px-4 py-3 pl-10 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-colors"
+                        className="w-full text-sm rounded-xl px-4 py-3 pl-11 transition-all duration-200
+                          bg-white/10 border border-white/20 text-white placeholder:text-white/35 focus:outline-none focus:border-white/50 focus:ring-2 focus:ring-white/20
+                          lg:bg-gray-50 lg:border-gray-200 lg:text-gray-900 lg:placeholder:text-gray-400 lg:focus:border-indigo-500 lg:focus:ring-2 lg:focus:ring-indigo-500/20"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-zinc-300">Password</label>
+                      <label className="text-xs font-medium text-white/80 lg:text-gray-700">Password</label>
                       <button
                         type="button"
                         onClick={() => setView("forgot")}
-                        className="text-[11px] text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors"
+                        className="text-[11px] font-medium text-white/50 hover:text-white lg:text-indigo-600 lg:hover:text-indigo-700 cursor-pointer transition-colors"
                       >
                         Forgot password?
                       </button>
                     </div>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-white/40 lg:text-gray-400" />
                       <input
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm rounded-xl px-4 py-3 pl-10 pr-10 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-colors"
+                        className="w-full text-sm rounded-xl px-4 py-3 pl-11 pr-11 transition-all duration-200
+                          bg-white/10 border border-white/20 text-white placeholder:text-white/35 focus:outline-none focus:border-white/50 focus:ring-2 focus:ring-white/20
+                          lg:bg-gray-50 lg:border-gray-200 lg:text-gray-900 lg:placeholder:text-gray-400 lg:focus:border-indigo-500 lg:focus:ring-2 lg:focus:ring-indigo-500/20"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(p => !p)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white lg:text-gray-400 lg:hover:text-gray-600 transition-colors"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
                       </button>
                     </div>
                   </div>
 
                   {errorMsg && (
-                    <div className={`rounded-lg px-3 py-2 border ${
+                    <div className={`rounded-lg px-3.5 py-2.5 border ${
                       isAccessDeniedError
-                        ? "bg-amber-500/10 border-amber-500/20"
-                        : "bg-red-500/10 border-red-500/20"
+                        ? "bg-amber-50 border-amber-200 lg:bg-amber-50 lg:border-amber-200"
+                        : "bg-red-50 border-red-200 lg:bg-red-50 lg:border-red-200"
                     }`}>
                       <p className={`text-xs font-medium ${
-                        isAccessDeniedError ? "text-amber-400" : "text-red-400"
+                        isAccessDeniedError ? "text-amber-700" : "text-red-600"
                       }`}>{errorMsg}</p>
                     </div>
                   )}
@@ -247,10 +257,10 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-semibold rounded-xl py-3 transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-semibold rounded-xl py-3 transition-all duration-200 cursor-pointer shadow-md shadow-indigo-600/25 hover:shadow-lg hover:shadow-indigo-600/30"
                   >
                     {isLoading ? (
-                      <div className="h-4 w-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <>
                         Sign In
@@ -272,55 +282,57 @@ export default function LoginPage() {
                 className="space-y-6"
               >
                 <div className="space-y-1.5">
-                  <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                    <Lock className="h-5 w-5 text-zinc-400" />
+                  <h2 className="text-[26px] font-bold tracking-tight text-white lg:text-gray-900 flex items-center gap-2.5">
+                    <Lock className="h-5 w-5 text-white/60 lg:text-indigo-500" />
                     Forgot Password
                   </h2>
-                  <p className="text-xs text-zinc-400">
-                    Enter your email and we'll send a recovery link.
+                  <p className="text-sm text-white/60 lg:text-gray-500">
+                    Enter your email and we&apos;ll send a recovery link.
                   </p>
                 </div>
 
                 {successMsg && (
-                  <div className="flex items-center gap-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                    <p className="text-xs text-emerald-400">{successMsg}</p>
+                  <div className="flex items-center gap-2.5 rounded-lg bg-emerald-50 border border-emerald-200 p-3.5">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <p className="text-xs font-medium text-emerald-700">{successMsg}</p>
                   </div>
                 )}
 
                 <form onSubmit={handleForgotSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-zinc-300">Email Address</label>
+                    <label className="text-xs font-medium text-white/80 lg:text-gray-700">Email Address</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-white/40 lg:text-gray-400" />
                       <input
                         type="email"
                         placeholder="you@example.com"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm rounded-xl px-4 py-3 pl-10 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-colors"
+                        className="w-full text-sm rounded-xl px-4 py-3 pl-11 transition-all duration-200
+                          bg-white/10 border border-white/20 text-white placeholder:text-white/35 focus:outline-none focus:border-white/50 focus:ring-2 focus:ring-white/20
+                          lg:bg-gray-50 lg:border-gray-200 lg:text-gray-900 lg:placeholder:text-gray-400 lg:focus:border-indigo-500 lg:focus:ring-2 lg:focus:ring-indigo-500/20"
                       />
                     </div>
                   </div>
 
                   {errorMsg && (
-                    <p className="text-xs text-red-400 font-medium">{errorMsg}</p>
+                    <p className="text-xs text-red-600 font-medium">{errorMsg}</p>
                   )}
 
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-zinc-200 disabled:opacity-60 text-sm font-semibold rounded-xl py-3 transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60 text-sm font-semibold rounded-xl py-3 transition-all duration-200 cursor-pointer shadow-md shadow-indigo-600/25 hover:shadow-lg hover:shadow-indigo-600/30"
                   >
                     {isLoading ? (
-                      <div className="h-4 w-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : "Send Recovery Link"}
                   </button>
 
                   <button
                     type="button"
                     onClick={() => { setView("login"); setErrorMsg(""); setSuccessMsg("") }}
-                    className="w-full text-center text-xs text-zinc-500 hover:text-zinc-200 cursor-pointer transition-colors"
+                    className="w-full text-center text-xs font-medium text-white/50 hover:text-white lg:text-gray-500 lg:hover:text-indigo-600 cursor-pointer transition-colors"
                   >
                     ← Back to Sign In
                   </button>
