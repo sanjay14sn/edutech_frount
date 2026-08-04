@@ -8,6 +8,7 @@ import {
   clearAuthSession,
   verifyStudentPortalAccess,
 } from "@/lib/studentAccess"
+import { PageLoader } from "@/components/shared/PageLoader"
 
 /**
  * SessionGuard — runs on every page load and verifies the stored JWT
@@ -89,11 +90,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
 
   // Show nothing until session check completes — prevents flash of wrong content
   if (!checked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-6 w-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    )
+    return <PageLoader variant="fullscreen" />
   }
 
   return <>{children}</>

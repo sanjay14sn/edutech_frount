@@ -10,7 +10,7 @@ import {
   ExternalLink, Check, Trash2, Edit2, PlayCircle, Eye, Settings2, 
   Send, Sparkles, Trophy, Star, SendHorizontal, Brain, 
   CheckCheck, RefreshCw, Layers, MapPin,
-  ClipboardCheck, Upload
+  ClipboardCheck, Upload, Users, Shield, Building2, MonitorPlay, LayoutGrid
 } from "lucide-react"
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/Card"
@@ -146,6 +146,29 @@ interface AiGeneratedPreview {
 
 const INITIAL_COURSES: CourseLMS[] = [] // Using store data now
 
+function getCapacityPercent(enrolled: number, capacity: number) {
+  if (!capacity) return 0
+  return Math.min(100, Math.round((enrolled / capacity) * 100))
+}
+
+function getCapacityBarClass(percent: number) {
+  if (percent >= 90) return "bg-destructive"
+  if (percent >= 70) return "bg-amber-500"
+  return "bg-primary"
+}
+
+function getPlatformLabel(platform?: string) {
+  if (platform === "gmeet") return "Google Meet"
+  if (platform === "teams") return "MS Teams"
+  if (platform === "zoom") return "Zoom"
+  if (platform === "discord") return "Discord"
+  return "Live Session"
+}
+
+function countEnabledModules(features: CourseLMS["features"]) {
+  return Object.entries(features).filter(([key, enabled]) => key !== "codingTests" && enabled).length
+}
+
 // Initial data moved to useStore.ts
 
 export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
@@ -202,7 +225,8 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
 
   const [courses, setCourses] = React.useState<CourseLMS[]>(tenantCourses)
   const [selectedCourse, setSelectedCourse] = React.useState<CourseLMS>(tenantCourses[0] || DUMMY_COURSE)
-  const [loading, setLoading] = React.useState(false)
+  const [loading, setLoading] = React.useState(true)
+  const [courseSearchQuery, setCourseSearchQuery] = React.useState("")
 
   const displayedCoursesList = React.useMemo(() => {
     if (!user) return []
@@ -212,6 +236,25 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
     }
     return courses
   }, [courses, user])
+
+  const filteredCoursesList = React.useMemo(() => {
+    const query = courseSearchQuery.trim().toLowerCase()
+    if (!query) return displayedCoursesList
+    return displayedCoursesList.filter((course) =>
+      course.title.toLowerCase().includes(query) ||
+      course.code.toLowerCase().includes(query) ||
+      course.trainer.toLowerCase().includes(query) ||
+      (course.centerName || "").toLowerCase().includes(query) ||
+      course.schedule.toLowerCase().includes(query)
+    )
+  }, [displayedCoursesList, courseSearchQuery])
+
+  const lmsCourseStats = React.useMemo(() => ({
+    total: displayedCoursesList.length,
+    enrolled: displayedCoursesList.reduce((sum, course) => sum + course.enrolled, 0),
+    portalEnabled: displayedCoursesList.filter((course) => course.lmsPortalAccess).length,
+    online: displayedCoursesList.filter((course) => course.mode === "online").length,
+  }), [displayedCoursesList])
 
   // Synchronize state with store when tenantCourses updates
   React.useEffect(() => {
@@ -1419,22 +1462,33 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
   return (
     <div className="space-y-6">
       {!loading && user?.role === "student" && displayedCoursesList.length === 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
-          LMS access is not enabled for your account yet. Contact your trainer or institute admin.
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-black shadow-xs">
+          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold text-sm text-black">LMS Access Required</p>
+            <p className="text-xs text-black mt-1 leading-relaxed">
+              LMS access is not enabled for your account yet. Contact your trainer or institute admin.
+            </p>
+          </div>
         </div>
       )}
-      {/* Top Banner & Dynamic Role Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border">
+      {/* Top Banner */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <Layers className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">LMS Ecosystem</h1>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Layers className="h-5 w-5 text-primary" />
+            <span>LMS Ecosystem</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
             Manage video modules, evaluate code submissions, launch real-time online compilers, and verify course certificates.
           </p>
         </div>
-
+        {activeRole === "admin" && lmsTab === "courses" && (
+          <Badge variant="outline" className="border-primary/20 text-primary text-[10px] shrink-0">
+            <Shield className="h-3 w-3 mr-1 inline" />
+            Administrator View
+          </Badge>
+        )}
       </div>
 
       {/* Main Tab Controls */}
@@ -1759,161 +1813,301 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
         </TabsContent>
 
         {/* ------------------ COURSE MANAGEMENT ------------------ */}
-        <TabsContent value="courses" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Enrolled Courses & LMS Portal Access Settings</h3>
-            {activeRole === "admin" && (
-              <Badge variant="outline" className="border-primary/20 text-primary">
-                Administrator View Mode
-              </Badge>
-            )}
-          </div>
-
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-            {displayedCoursesList.map((course) => (
-              <Card key={course.id} className={`bg-card relative flex flex-col justify-between hover:border-border transition-all duration-200 ${selectedCourse.id === course.id ? "ring-1 ring-primary border-primary" : "border-border"}`}>
-                <div>
-                  <CardHeader className="pb-3 border-b border-border/40">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <Badge variant="outline" className="text-[9px] font-mono mb-1">{course.code}</Badge>
-                        <CardTitle className="text-base font-extrabold text-foreground">{course.title}</CardTitle>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        <div className="flex gap-1.5">
-                          <Badge variant="success">Open</Badge>
-                          <Badge variant="outline" className={course.mode === "offline" ? "bg-amber-500/5 border-amber-500/20 text-amber-500 font-bold text-[9px]" : "bg-blue-500/5 border-blue-500/20 text-blue-500 font-bold text-[9px]"}>
-                            {course.mode === "offline" ? "Offline" : "Online"}
-                          </Badge>
-                        </div>
-                      </div>
+        <TabsContent value="courses" className="space-y-5">
+          {loading ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-4">
+              <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <p className="text-xs text-muted-foreground">Loading LMS courses and batch portals...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Card className="bg-card border-border/60">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                      <LayoutGrid className="h-5 w-5 text-primary" />
                     </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4 pt-4">
-                    {/* Course Schedules & Details */}
-                    <div className="space-y-2 text-xs text-muted-foreground">
-                      <p className="flex items-center gap-2 text-foreground">
-                        <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span>{course.schedule}</span>
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span>Instructor: <strong className="text-foreground">{course.trainer}</strong></span>
-                      </p>
-                      {course.centerName && (
-                        <p className="flex items-center gap-2 text-foreground">
-                          <MapPin className="h-4 w-4 text-primary shrink-0" />
-                          <span>Campus: <strong className="text-foreground">{course.centerName}</strong></span>
-                        </p>
-                      )}
+                    <div>
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground">Active Batches</p>
+                      <p className="text-xl font-bold text-foreground">{lmsCourseStats.total}</p>
                     </div>
-
-                    {/* Room details / Virtual launch links */}
-                    {course.mode === "offline" ? (
-                      <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/10 px-2.5 py-1.5 text-xs font-semibold">
-                        <span className="flex items-center gap-2 text-foreground">
-                          <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                          <span>In-Person Training</span>
-                        </span>
-                        <span className="text-[10px] font-bold text-primary font-mono uppercase bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                          Room {course.roomName || "TBD"}
-                        </span>
-                      </div>
-                    ) : course.meetLink ? (
-                      <div className="flex items-center justify-between rounded-lg border border-border bg-zinc-950/20 px-2.5 py-1.5 text-xs font-semibold">
-                        <span className="flex items-center gap-2 text-foreground">
-                          <Video className="h-4 w-4 shrink-0 text-primary" />
-                          <span className="capitalize">{course.platform === "gmeet" ? "Google Meet" : course.platform === "teams" ? "MS Teams Live" : "Zoom Room"}</span>
-                        </span>
-                        <a
-                          href={course.meetLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-primary font-bold bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded hover:bg-primary/20 flex items-center gap-1"
-                        >
-                          <span>Launch</span>
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </div>
-                    ) : null}
-
-                    {/* Capacity metric — admin/trainer only */}
-                    {activeRole !== "student" && (
-                    <div className="space-y-1.5 pt-3 border-t border-border/40">
-                      <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                        <span>Enrolled: {course.enrolled} / {course.capacity} Students</span>
-                        <span>{((course.enrolled / course.capacity) * 100).toFixed(0)}% Capacity</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary"
-                          style={{ width: `${(course.enrolled / course.capacity) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    )}
-
-                    {/* LMS Portal Access Main Switch Toggle */}
-                    {(activeRole === "admin" || activeRole === "trainer") && (
-                      <div className="flex items-center justify-between p-3 rounded-lg border border-primary/20 bg-primary/5">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-foreground">LMS Portal Access Toggle</span>
-                          <span className="text-[9px] text-muted-foreground">Toggle platform login access for this batch</span>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            const updatedCourse = { ...course, lmsPortalAccess: !course.lmsPortalAccess }
-                            applyCourseUpdate(updatedCourse)
-                            await persistCourse(updatedCourse)
-                          }}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            course.lmsPortalAccess ? 'bg-primary' : 'bg-zinc-700'
-                          }`}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                              course.lmsPortalAccess ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    )}
-
                   </CardContent>
-                </div>
+                </Card>
+                <Card className="bg-card border-border/60">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                      <Users className="h-5 w-5 text-sky-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground">Enrolled Students</p>
+                      <p className="text-xl font-bold text-foreground">{lmsCourseStats.enrolled}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border/60">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                      <MonitorPlay className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground">LMS Portals On</p>
+                      <p className="text-xl font-bold text-foreground">{lmsCourseStats.portalEnabled}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-border/60">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                      <Video className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase font-semibold text-muted-foreground">Online Batches</p>
+                      <p className="text-xl font-bold text-foreground">{lmsCourseStats.online}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                <CardFooter className="pt-2 flex gap-2 border-t border-border/30 bg-muted/10 p-4 rounded-b-xl">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 text-[10px] h-7"
-                    onClick={() => {
-                      setSelectedCourse(course)
-                      setLmsTab("course-home")
-                    }}
-                  >
-                    Enter Course
-                  </Button>
-                  
-                  {activeRole === "admin" && (
-                    <Button 
-                      variant="primary" 
-                      className="text-[10px] h-7 px-2.5"
-                      onClick={() => {
-                        setEditingCourse(course)
-                        setShowConfigModal(true)
-                      }}
-                    >
-                      <Settings2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            ))}
-            {displayedCoursesList.length === 0 && (
-              <p className="text-xs text-muted-foreground italic col-span-2 py-4 pl-1">No enrolled courses or LMS portals active.</p>
-            )}
-          </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-card border border-border rounded-xl p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Course Portals</h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Open a batch portal to manage modules, content, and student LMS access.
+                  </p>
+                </div>
+                <div className="relative w-full sm:max-w-xs">
+                  <Search className="absolute top-1/2 left-3 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search batch, course, instructor..."
+                    value={courseSearchQuery}
+                    onChange={(e) => setCourseSearchQuery(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-border bg-background pl-9 pr-3 text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {filteredCoursesList.length === 0 ? (
+                <Card className="bg-card border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-16 text-center px-4">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 border border-border">
+                      <BookOpen className="h-7 w-7 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {courseSearchQuery ? "No matching course portals" : "No enrolled courses yet"}
+                    </p>
+                    <p className="mt-1 max-w-md text-xs text-muted-foreground leading-relaxed">
+                      {courseSearchQuery
+                        ? "Try a different search term or clear the filter to see all batches."
+                        : "Create batches from Courses & Batches, then enable LMS portal access for students."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredCoursesList.map((course) => {
+                    const capacityPercent = getCapacityPercent(course.enrolled, course.capacity)
+                    const enabledModules = countEnabledModules(course.features)
+                    const isSelected = selectedCourse.id === course.id
+
+                    return (
+                      <Card
+                        key={course.id}
+                        className={`group bg-card overflow-hidden flex flex-col transition-all duration-200 hover:shadow-md hover:border-primary/40 border border-border/50 ${
+                          isSelected ? "ring-1 ring-primary/40 border-primary/50 shadow-xs" : ""
+                        }`}
+                      >
+                        <div
+                          className={`h-1 ${
+                            course.mode === "offline"
+                              ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                              : "bg-gradient-to-r from-primary via-sky-500 to-cyan-500"
+                          }`}
+                        />
+
+                        <CardHeader className="pb-3 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <Badge variant="outline" className="text-[9px] font-mono">
+                                  {course.code}
+                                </Badge>
+                                <Badge variant="success" className="text-[9px]">Open</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    course.mode === "offline"
+                                      ? "text-[9px] bg-amber-500/5 border-amber-500/20 text-amber-600"
+                                      : "text-[9px] bg-blue-500/5 border-blue-500/20 text-blue-600"
+                                  }
+                                >
+                                  {course.mode === "offline" ? "Offline" : "Online"}
+                                </Badge>
+                              </div>
+                              <CardTitle className="text-base font-bold text-foreground leading-snug truncate">
+                                {course.title}
+                              </CardTitle>
+                              <CardDescription className="text-[11px] mt-0.5 line-clamp-1">
+                                {course.batch || course.title}
+                              </CardDescription>
+                            </div>
+                            <div
+                              className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center border ${
+                                course.lmsPortalAccess
+                                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
+                                  : "bg-muted/40 border-border text-muted-foreground"
+                              }`}
+                              title={course.lmsPortalAccess ? "LMS portal enabled" : "LMS portal disabled"}
+                            >
+                              <BookOpen className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4 pt-0 flex-1">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2">
+                              <p className="text-[9px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> Schedule
+                              </p>
+                              <p className="text-[11px] font-medium text-foreground mt-1 capitalize line-clamp-2">
+                                {course.schedule || "Not set"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2">
+                              <p className="text-[9px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
+                                <User className="h-3 w-3" /> Instructor
+                              </p>
+                              <p className="text-[11px] font-medium text-foreground mt-1 line-clamp-2">
+                                {course.trainer || "Unassigned"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {course.mode === "offline" ? (
+                            <div className="flex items-center justify-between rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                              <span className="flex items-center gap-2 text-[11px] font-medium text-foreground">
+                                <MapPin className="h-3.5 w-3.5 text-amber-600" />
+                                In-Person Training
+                              </span>
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md font-mono uppercase">
+                                Room {course.roomName || "TBD"}
+                              </span>
+                            </div>
+                          ) : course.meetLink ? (
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+                              <span className="flex items-center gap-2 text-[11px] font-medium text-foreground min-w-0">
+                                <Video className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span className="truncate">{getPlatformLabel(course.platform)}</span>
+                              </span>
+                              <a
+                                href={course.meetLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-md hover:bg-primary/20 transition-colors"
+                              >
+                                Launch
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                          ) : null}
+
+                          {activeRole !== "student" && (
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[10px] font-medium">
+                                <span className="text-muted-foreground">
+                                  {course.enrolled} / {course.capacity} students
+                                </span>
+                                <span className={capacityPercent >= 90 ? "text-destructive" : "text-muted-foreground"}>
+                                  {capacityPercent}% full
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all ${getCapacityBarClass(capacityPercent)}`}
+                                  style={{ width: `${capacityPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground px-0.5">
+                            <span>{enabledModules} modules enabled</span>
+                            <span className={course.lmsPortalAccess ? "text-emerald-600 font-semibold" : "text-muted-foreground"}>
+                              {course.lmsPortalAccess ? "Portal active" : "Portal off"}
+                            </span>
+                          </div>
+
+                          {(activeRole === "admin" || activeRole === "trainer") && (
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 px-3 py-2.5">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-foreground">LMS Portal Access</p>
+                                <p className="text-[10px] text-muted-foreground">Student login for this batch</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const updatedCourse = { ...course, lmsPortalAccess: !course.lmsPortalAccess }
+                                  applyCourseUpdate(updatedCourse)
+                                  await persistCourse(updatedCourse)
+                                }}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  course.lmsPortalAccess ? "bg-primary" : "bg-muted-foreground/30"
+                                }`}
+                                aria-label="Toggle LMS portal access"
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                                    course.lmsPortalAccess ? "translate-x-4" : "translate-x-0"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          )}
+                        </CardContent>
+
+                        <CardFooter className="pt-0 pb-4 px-4 flex gap-2 border-t border-border/40 bg-muted/5">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="flex-1 h-8 text-xs gap-1.5"
+                            icon={PlayCircle}
+                            onClick={() => {
+                              setSelectedCourse(course)
+                              setLmsTab("course-home")
+                            }}
+                          >
+                            Enter Course
+                          </Button>
+                          {activeRole === "admin" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0 shrink-0"
+                              onClick={() => {
+                                setEditingCourse(course)
+                                setShowConfigModal(true)
+                              }}
+                              title="Configure course"
+                            >
+                              <Settings2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Module/Features Config Dialog */}
           {showConfigModal && editingCourse && (

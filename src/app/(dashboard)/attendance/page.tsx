@@ -26,22 +26,7 @@ import {
 } from "@/lib/sessionUtils"
 import { formatDuration, shiftStatusLabel, type ShiftStatus } from "@/lib/shiftTimer"
 import { cn } from "@/lib/utils"
-
-function AttendancePageLoader({ message = "Loading attendance..." }: { message?: string }) {
-  return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 py-20">
-      <svg className="h-10 w-10 animate-spin text-primary" fill="none" viewBox="0 0 24 24" aria-hidden>
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-        />
-      </svg>
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground animate-pulse">{message}</p>
-    </div>
-  )
-}
+import { PageLoader } from "@/components/shared/PageLoader"
 
 interface AttendanceRecord {
   entityId: string
@@ -64,13 +49,14 @@ function mergeBdeAttendanceRecords(bdes: any[], existing: any[]): AttendanceReco
   return bdes.map((b: any) => {
     const id = String(b.id)
     const att = byEntity.get(id)
+    const hasLiveShift = att?.shiftStatus === "active" || att?.shiftStatus === "paused"
     return {
       entityId: id,
       name: b.name,
-      status: att?.status || "present",
+      status: att?.status || (hasLiveShift ? "present" : "absent"),
       loginTime: att?.loginTime,
       logoutTime: att?.logoutTime,
-      shiftStatus: att?.shiftStatus,
+      shiftStatus: att?.shiftStatus || "offline",
       workedSeconds: att?.workedSeconds,
     }
   })
@@ -172,6 +158,7 @@ export default function AttendancePage() {
   const [isClassDayForBatch, setIsClassDayForBatch] = React.useState(true)
   const [attendanceLogs, setAttendanceLogs] = React.useState<any[]>([])
   const [searchTerm, setSearchTerm] = React.useState("")
+  const [submittingBde, setSubmittingBde] = React.useState(false)
   const [selectedSessionIndex, setSelectedSessionIndex] = React.useState(0)
   const [sessionManuallySelected, setSessionManuallySelected] = React.useState(false)
   const [sessionClock, setSessionClock] = React.useState(() => new Date())
@@ -267,8 +254,34 @@ export default function AttendancePage() {
     return { total, active, paused, finished, offline }
   }, [records])
 
+  const applyBdeStatus = (
+    record: AttendanceRecord,
+    status: AttendanceRecord["status"]
+  ): AttendanceRecord => {
+    if (status === "absent") {
+      return {
+        ...record,
+        status,
+        loginTime: "",
+        logoutTime: "",
+        shiftStatus: "offline",
+        workedSeconds: 0,
+      }
+    }
+    const live = record.shiftStatus === "active" || record.shiftStatus === "paused"
+    return {
+      ...record,
+      status,
+      loginTime: record.loginTime || "09:30 AM",
+      logoutTime: record.logoutTime || "06:30 PM",
+      shiftStatus: live ? record.shiftStatus : "finished",
+    }
+  }
+
   const handleMarkAllStatus = (status: AttendanceRecord["status"]) => {
-    setRecords(prev => prev.map(r => ({ ...r, status })))
+    setRecords((prev) =>
+      prev.map((r) => (category === "bde" ? applyBdeStatus(r, status) : { ...r, status }))
+    )
   }
 
   React.useEffect(() => {
@@ -494,22 +507,56 @@ export default function AttendancePage() {
 
   const handleUpdateStatus = (entityId: string, status: AttendanceRecord["status"]) => {
     setRecords((prev) =>
-      prev.map((r) => (r.entityId === entityId ? { ...r, status } : r))
+      prev.map((r) => {
+        if (r.entityId !== entityId) return r
+        if (category === "bde") return applyBdeStatus(r, status)
+        return { ...r, status }
+      })
+    )
+  }
+
+  const handleUpdateBdeTime = (
+    entityId: string,
+    field: "loginTime" | "logoutTime",
+    value: string
+  ) => {
+    setRecords((prev) =>
+      prev.map((r) => (r.entityId === entityId ? { ...r, [field]: value } : r))
     )
   }
 
   const handleSubmitAttendance = async () => {
     try {
-      await api.saveAttendance(date, category, records)
+      if (category === "bde") setSubmittingBde(true)
+      const payload =
+        category === "bde"
+          ? records.map((r) => ({
+              entityId: r.entityId,
+              name: r.name,
+              status: r.status,
+              loginTime: r.status === "absent" ? "" : r.loginTime || "09:30 AM",
+              logoutTime: r.status === "absent" ? "" : r.logoutTime || "06:30 PM",
+            }))
+          : records
+      await api.saveAttendance(date, category, payload)
       addNotification({
         title: "Attendance Recorded",
         description: `Daily ledger submitted for ${category}s on ${date}.`,
         type: "attendance"
       })
+      if (category === "bde") {
+        const [existing, bdes] = await Promise.all([
+          api.getAttendance(date, "bde"),
+          api.getBdes(),
+        ])
+        setRecords(mergeBdeAttendanceRecords(bdes, existing))
+      }
       alert(`Success: Attendance report submitted for ${category}s!`)
     } catch (err: any) {
       console.error(err)
       alert(err.message || "Failed to submit attendance")
+    } finally {
+      setSubmittingBde(false)
     }
   }
 
@@ -659,7 +706,7 @@ export default function AttendancePage() {
   // Render Student View
   if (role === "student") {
     if (loadingStudent || !pageReady) {
-      return <AttendancePageLoader message="Loading attendance..." />
+      return <PageLoader />
     }
 
     if (!studentBatch) {
@@ -852,12 +899,12 @@ export default function AttendancePage() {
   }
 
   if (!role) {
-    return <AttendancePageLoader />
+    return <PageLoader />
   }
 
   if (role === "bde" && user) {
     if (!pageReady) {
-      return <AttendancePageLoader message="Loading shift log..." />
+      return <PageLoader />
     }
 
     const myRecord = records[0]
@@ -991,7 +1038,7 @@ export default function AttendancePage() {
 
   // --- TRAINER / OWNER VIEW ---
   if (!pageReady || loadingBatches) {
-    return <AttendancePageLoader message="Loading attendance terminal..." />
+    return <PageLoader />
   }
 
   return (
@@ -1040,7 +1087,7 @@ export default function AttendancePage() {
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {category === "bde"
-              ? "Audit BDE shift punch logs — login, pause, and logout times sync automatically from the dashboard."
+              ? "Audit BDE shift punches and manually mark attendance when BDEs did not punch in from their dashboard."
               : `Log daily check-ins, audit terminal logs, or configure hardware readers for ${category}s.`}
           </p>
         </div>
@@ -1185,7 +1232,9 @@ export default function AttendancePage() {
                       </CardTitle>
                       <CardDescription>
                         {category === "bde"
-                          ? "Shift times are recorded automatically when BDEs punch in, pause, or logout from their dashboard."
+                          ? isBde
+                            ? "Shift times are recorded automatically when you punch in, pause, or logout from your dashboard."
+                            : "Live punches sync from the BDE dashboard. Use manual marking below when a BDE did not punch in."
                           : "Verify and modify status before submitting. Default is Present."}
                         {activeSessionTopic && (
                           <span className="block mt-1 space-y-1">
@@ -1242,27 +1291,45 @@ export default function AttendancePage() {
 
                   {/* Headcount Dashboard Widgets */}
                   {category === "bde" ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3">
-                      <div className="bg-secondary/20 p-2 rounded-lg border border-border/30 text-center">
-                        <span className="text-[9px] uppercase font-bold text-muted-foreground block">Total</span>
-                        <strong className="text-sm font-black text-foreground">{bdeShiftStats.total}</strong>
+                    <div className="space-y-2 pt-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="bg-secondary/20 p-2 rounded-lg border border-border/30 text-center">
+                          <span className="text-[9px] uppercase font-bold text-muted-foreground block">Total</span>
+                          <strong className="text-sm font-black text-foreground">{bdeShiftStats.total}</strong>
+                        </div>
+                        <div className="bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20 text-center">
+                          <span className="text-[9px] uppercase font-bold text-emerald-500 block">Active</span>
+                          <strong className="text-sm font-black text-emerald-500">{bdeShiftStats.active}</strong>
+                        </div>
+                        <div className="bg-amber-500/5 p-2 rounded-lg border border-amber-500/20 text-center">
+                          <span className="text-[9px] uppercase font-bold text-amber-500 block">On Break</span>
+                          <strong className="text-sm font-black text-amber-500">{bdeShiftStats.paused}</strong>
+                        </div>
+                        <div className="bg-sky-500/5 p-2 rounded-lg border border-sky-500/20 text-center">
+                          <span className="text-[9px] uppercase font-bold text-sky-500 block">Finished</span>
+                          <strong className="text-sm font-black text-sky-500">{bdeShiftStats.finished}</strong>
+                        </div>
+                        <div className="bg-zinc-500/5 p-2 rounded-lg border border-zinc-500/20 text-center">
+                          <span className="text-[9px] uppercase font-bold text-zinc-500 block">Offline</span>
+                          <strong className="text-sm font-black text-zinc-500">{bdeShiftStats.offline}</strong>
+                        </div>
                       </div>
-                      <div className="bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20 text-center">
-                        <span className="text-[9px] uppercase font-bold text-emerald-500 block">Active</span>
-                        <strong className="text-sm font-black text-emerald-500">{bdeShiftStats.active}</strong>
-                      </div>
-                      <div className="bg-amber-500/5 p-2 rounded-lg border border-amber-500/20 text-center">
-                        <span className="text-[9px] uppercase font-bold text-amber-500 block">On Break</span>
-                        <strong className="text-sm font-black text-amber-500">{bdeShiftStats.paused}</strong>
-                      </div>
-                      <div className="bg-sky-500/5 p-2 rounded-lg border border-sky-500/20 text-center">
-                        <span className="text-[9px] uppercase font-bold text-sky-500 block">Finished</span>
-                        <strong className="text-sm font-black text-sky-500">{bdeShiftStats.finished}</strong>
-                      </div>
-                      <div className="bg-zinc-500/5 p-2 rounded-lg border border-zinc-500/20 text-center">
-                        <span className="text-[9px] uppercase font-bold text-zinc-500 block">Offline</span>
-                        <strong className="text-sm font-black text-zinc-500">{bdeShiftStats.offline}</strong>
-                      </div>
+                      {!isBde && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20 text-center">
+                            <span className="text-[9px] uppercase font-bold text-emerald-500 block">Marked Present</span>
+                            <strong className="text-sm font-black text-emerald-500">{rollCallStats.present}</strong>
+                          </div>
+                          <div className="bg-red-500/5 p-2 rounded-lg border border-red-500/20 text-center">
+                            <span className="text-[9px] uppercase font-bold text-red-500 block">Marked Absent</span>
+                            <strong className="text-sm font-black text-red-500">{rollCallStats.absent}</strong>
+                          </div>
+                          <div className="bg-amber-500/5 p-2 rounded-lg border border-amber-500/20 text-center">
+                            <span className="text-[9px] uppercase font-bold text-amber-500 block">Marked Late</span>
+                            <strong className="text-sm font-black text-amber-500">{rollCallStats.late}</strong>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                   <div className="grid grid-cols-4 gap-2 pt-3">
@@ -1300,7 +1367,7 @@ export default function AttendancePage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {category !== "bde" && (
+                    {category !== "bde" || !isBde ? (
                       <>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase mr-1">Bulk Mark:</span>
                     <button
@@ -1325,7 +1392,7 @@ export default function AttendancePage() {
                       <span>All Late</span>
                     </button>
                       </>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -1355,6 +1422,9 @@ export default function AttendancePage() {
                           if (record.shiftStatus === "active") cardBg = "bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20"
                           else if (record.shiftStatus === "paused") cardBg = "bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/20"
                           else if (record.shiftStatus === "finished") cardBg = "bg-sky-500/5 hover:bg-sky-500/10 border-sky-500/20"
+                          else if (record.status === "present") cardBg = "bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20"
+                          else if (record.status === "late") cardBg = "bg-amber-500/5 hover:bg-amber-500/10 border-amber-500/20"
+                          else if (record.status === "absent") cardBg = "bg-red-500/5 hover:bg-red-500/10 border-red-500/20"
                         } else {
                           if (record.status === "present") cardBg = "bg-emerald-500/5 hover:bg-emerald-500/10 border-emerald-500/20"
                           if (record.status === "absent") cardBg = "bg-red-500/5 hover:bg-red-500/10 border-red-500/20"
@@ -1415,6 +1485,20 @@ export default function AttendancePage() {
                                       >
                                         {shiftStatusLabel(record.shiftStatus || "offline")}
                                       </Badge>
+                                      {!isBde && (
+                                        <Badge
+                                          variant="outline"
+                                          className={`text-[9px] h-5 px-1.5 capitalize ${
+                                            record.status === "present"
+                                              ? "border-emerald-500/30 text-emerald-600"
+                                              : record.status === "late"
+                                                ? "border-amber-500/30 text-amber-600"
+                                                : "border-red-500/30 text-red-600"
+                                          }`}
+                                        >
+                                          {record.status}
+                                        </Badge>
+                                      )}
                                       {record.workedSeconds != null && record.workedSeconds > 0 && (
                                         <span className="text-[10px] font-mono font-semibold text-primary">
                                           {formatDuration(record.workedSeconds)} worked
@@ -1426,7 +1510,8 @@ export default function AttendancePage() {
                               </div>
                             </div>
 
-                            {category !== "bde" && (
+                            {(category !== "bde" || !isBde) && (
+                            <div className="space-y-2">
                             <div className="grid grid-cols-3 gap-1 bg-secondary/35 p-1 rounded-lg border border-border/30">
                               <button
                                 onClick={() => handleUpdateStatus(record.entityId, "present")}
@@ -1462,6 +1547,35 @@ export default function AttendancePage() {
                                 <span>Late</span>
                               </button>
                             </div>
+                            {category === "bde" && record.status !== "absent" && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-semibold text-muted-foreground uppercase">Login</label>
+                                  <input
+                                    type="text"
+                                    value={record.loginTime || ""}
+                                    onChange={(e) =>
+                                      handleUpdateBdeTime(record.entityId, "loginTime", e.target.value)
+                                    }
+                                    placeholder="09:30 AM"
+                                    className="w-full h-8 px-2 rounded-md border border-border bg-card text-[11px] font-mono"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-semibold text-muted-foreground uppercase">Logout</label>
+                                  <input
+                                    type="text"
+                                    value={record.logoutTime || ""}
+                                    onChange={(e) =>
+                                      handleUpdateBdeTime(record.entityId, "logoutTime", e.target.value)
+                                    }
+                                    placeholder="06:30 PM"
+                                    className="w-full h-8 px-2 rounded-md border border-border bg-card text-[11px] font-mono"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            </div>
                             )}
                           </div>
                         )
@@ -1471,10 +1585,15 @@ export default function AttendancePage() {
                 </CardContent>
               </Card>
 
-              {records.length > 0 && category !== "bde" && (
+              {records.length > 0 && (category !== "bde" || !isBde) && (
                 <div className="flex justify-end pt-2">
-                  <Button variant="primary" icon={CalendarCheck} onClick={handleSubmitAttendance}>
-                    Submit Attendance Log
+                  <Button
+                    variant="primary"
+                    icon={CalendarCheck}
+                    onClick={handleSubmitAttendance}
+                    disabled={submittingBde}
+                  >
+                    {category === "bde" ? "Save BDE Attendance" : "Submit Attendance Log"}
                   </Button>
                 </div>
               )}

@@ -125,6 +125,15 @@ export interface Lead {
   source?: string
   priority?: "low" | "medium" | "high"
   nextFollowUpDate?: string
+  chatbotEnabled?: boolean
+  autoReplyEnabled?: boolean
+  followUpsEnabled?: boolean
+  emailStatus?: string
+  outreachSentAt?: string | null
+  repliedAt?: string | null
+  incomingReplies?: { messageId?: string; body?: string; receivedAt?: string }[]
+  intentScore?: number
+  lastIntent?: string
 }
 
 export interface BDE {

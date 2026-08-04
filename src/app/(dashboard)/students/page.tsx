@@ -4,7 +4,8 @@ import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Users, Search, Plus, Filter, Download, ArrowLeft, MoreHorizontal, Mail, Phone,
-  FileCheck, ShieldAlert, BadgeDollarSign, CalendarRange, GraduationCap, Clock, FileDown, CheckSquare, Trash2, Calendar
+  FileCheck, ShieldAlert, BadgeDollarSign, CalendarRange, GraduationCap, Clock, FileDown, CheckSquare, Trash2, Calendar,
+  ChevronLeft, ChevronRight
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -43,6 +44,8 @@ export interface Student {
   password?: string
 }
 
+const STUDENTS_PAGE_SIZE = 10
+
 export default function StudentsPage() {
   const { addNotification, user, fetchCenterPolicy } = useStore()
   const { policy, atCapacity } = useCenterPolicy()
@@ -53,9 +56,11 @@ export default function StudentsPage() {
   const [students, setStudents] = React.useState<Student[]>([])
   const [courses, setCourses] = React.useState<any[]>([])
   const [batches, setBatches] = React.useState<any[]>([])
+  const [pageLoading, setPageLoading] = React.useState(true)
   
   React.useEffect(() => {
     const loadData = async () => {
+      setPageLoading(true)
       try {
         await fetchCenterPolicy()
         const [studentsData, coursesData, batchesData] = await Promise.all([
@@ -63,14 +68,16 @@ export default function StudentsPage() {
           api.getCourses(),
           api.getBatches().catch(() => [])
         ])
-        setStudents(studentsData)
-        setCourses(coursesData)
+        setStudents(studentsData || [])
+        setCourses(coursesData || [])
         setBatches(batchesData || [])
-        if (coursesData.length > 0) {
+        if (coursesData?.length > 0) {
           setCourse(coursesData[0].name)
         }
       } catch (err) {
         console.error("Failed to load students, courses, or batches:", err)
+      } finally {
+        setPageLoading(false)
       }
     }
     loadData()
@@ -219,18 +226,27 @@ export default function StudentsPage() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = React.useState(1)
-  const itemsPerPage = 10
 
   React.useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, filterStatus, filterCourse, filterBatch, showCourseBatchFilters, getStudentBatches])
+  }, [searchQuery, filterStatus, filterCourse, filterBatch])
 
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / STUDENTS_PAGE_SIZE))
+
+  React.useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const paginatedStudents = React.useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage
-    return filteredStudents.slice(start, start + itemsPerPage)
-  }, [filteredStudents, currentPage, itemsPerPage])
+    const start = (currentPage - 1) * STUDENTS_PAGE_SIZE
+    return filteredStudents.slice(start, start + STUDENTS_PAGE_SIZE)
+  }, [filteredStudents, currentPage])
+
+  const paginationStart =
+    filteredStudents.length === 0 ? 0 : (currentPage - 1) * STUDENTS_PAGE_SIZE + 1
+  const paginationEnd = Math.min(currentPage * STUDENTS_PAGE_SIZE, filteredStudents.length)
 
   const toggleSelectAll = () => {
     if (selectedIds.length === paginatedStudents.length) {
@@ -611,6 +627,22 @@ export default function StudentsPage() {
     ]
   }
 
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
+        <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <p className="text-xs text-muted-foreground">Loading students directory...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Panel */}
@@ -863,47 +895,37 @@ export default function StudentsPage() {
           </div>
 
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-secondary/10">
+          {filteredStudents.length > 0 && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-border bg-secondary/10">
               <div className="text-[11px] text-muted-foreground">
-                Showing <span className="font-semibold text-foreground">{((currentPage - 1) * itemsPerPage) + 1}</span> to{" "}
-                <span className="font-semibold text-foreground">
-                  {Math.min(currentPage * itemsPerPage, filteredStudents.length)}
-                </span>{" "}
-                of <span className="font-semibold text-foreground">{filteredStudents.length}</span> students
+                Showing <span className="font-semibold text-foreground">{paginationStart}</span> to{" "}
+                <span className="font-semibold text-foreground">{paginationEnd}</span> of{" "}
+                <span className="font-semibold text-foreground">{filteredStudents.length}</span> students
+                <span className="text-muted-foreground/80"> · {STUDENTS_PAGE_SIZE} per page</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  icon={ChevronLeft}
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
-                  className="h-7 text-[10px] px-2.5"
+                  className="h-8 text-xs"
                 >
                   Previous
                 </Button>
-                
-                {/* Page numbers */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "primary" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`h-7 w-7 text-[10px] p-0 ${currentPage === pageNum ? "shadow-xs" : ""}`}
-                  >
-                    {pageNum}
-                  </Button>
-                ))}
-
+                <span className="text-xs font-medium text-foreground px-1">
+                  Page {currentPage} of {totalPages}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
-                  className="h-7 text-[10px] px-2.5"
+                  className="h-8 text-xs"
                 >
                   Next
+                  <ChevronRight className="h-3.5 w-3.5 ml-1" />
                 </Button>
               </div>
             </div>

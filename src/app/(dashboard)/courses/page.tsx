@@ -199,7 +199,7 @@ export default function CoursesPage() {
   const canDeleteBatch = isAdmin || (isTrainer && allowTrainerDeleteBatch)
   const [batches, setBatches] = React.useState<Batch[]>([])
   const [courses, setCourses] = React.useState<any[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const [pageLoading, setPageLoading] = React.useState(true)
   const [isAddOpen, setIsAddOpen] = React.useState(false)
   const [isCourseAddOpen, setIsCourseAddOpen] = React.useState(false)
   const [dialogView, setDialogView] = React.useState<"form" | "students">("form")
@@ -239,6 +239,7 @@ export default function CoursesPage() {
   React.useEffect(() => {
     const loadData = async () => {
       try {
+        setPageLoading(true)
         const [batchesData, coursesData, trainersData, studentsData, centersData] = await Promise.all([
           fetchAPI('/batches'),
           fetchAPI('/courses'),
@@ -276,7 +277,7 @@ export default function CoursesPage() {
       } catch (error) {
         console.error("Failed to fetch courses and batches:", error);
       } finally {
-        setIsLoading(false);
+        setPageLoading(false);
       }
     };
     loadData();
@@ -340,11 +341,11 @@ export default function CoursesPage() {
   }, [])
 
   React.useEffect(() => {
-    if (isLoading || !isAdmin) return
+    if (pageLoading || !isAdmin) return
     if (searchParams.get("action") !== "add-course") return
     openAddCourseDialog()
     router.replace("/courses", { scroll: false })
-  }, [isLoading, isAdmin, searchParams, openAddCourseDialog, router])
+  }, [pageLoading, isAdmin, searchParams, openAddCourseDialog, router])
 
   React.useEffect(() => {
     if (centersList[0]) {
@@ -556,7 +557,7 @@ export default function CoursesPage() {
     }
   }
 
-  if (isLoading) {
+  if (pageLoading) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
         <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
@@ -588,7 +589,7 @@ export default function CoursesPage() {
             <Button variant="outline" size="sm" icon={Plus} onClick={openAddCourseDialog}>
               Add Course Program
             </Button>
-            <Button variant="primary" size="sm" icon={Plus} onClick={() => {
+            <Button variant="outline" size="sm" icon={Plus} onClick={() => {
               setEditingBatch(null)
               setCode("")
               setCourseName(courses[0]?.name || "")
@@ -673,7 +674,7 @@ export default function CoursesPage() {
               </p>
               {isAdmin && (
                 <Button
-                  variant="primary"
+                  variant="outline"
                   size="sm"
                   className="mt-4 h-8 text-xs"
                   icon={Plus}

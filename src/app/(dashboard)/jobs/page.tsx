@@ -1473,7 +1473,7 @@ export default function JobPortalPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="rounded-none border border-primary/20 bg-primary/5 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="space-y-0.5">
               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -1490,7 +1490,7 @@ export default function JobPortalPage() {
               icon={isGeneratingJobContent ? Loader2 : Sparkles}
               disabled={isGeneratingJobContent || !jobTitle.trim()}
               onClick={() => void handleGenerateJobContent()}
-              className={`text-xs shrink-0 border-primary/20 text-primary hover:bg-primary/10 ${
+              className={`text-xs shrink-0 border-primary/20 text-primary hover:bg-primary/10 rounded-none ${
                 isGeneratingJobContent ? "[&_svg]:animate-spin" : ""
               }`}
             >
@@ -1505,7 +1505,7 @@ export default function JobPortalPage() {
               value={jobDesc}
               onChange={(e) => setJobDesc(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-border bg-card p-3 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-none border border-border bg-card p-3 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
@@ -1515,7 +1515,7 @@ export default function JobPortalPage() {
               placeholder="React, TypeScript, Figma, Tailwind"
               value={jobReqs}
               onChange={(e) => setJobReqs(e.target.value)}
-              className="bg-card text-xs h-9.5"
+              className="bg-card text-xs h-9.5 rounded-none"
             />
           </div>
 
@@ -1525,7 +1525,7 @@ export default function JobPortalPage() {
               <span className="text-[10px] text-muted-foreground">Required</span>
             </div>
 
-            <label className="flex items-center gap-2 rounded-lg border border-border/70 bg-secondary/20 px-3 py-2 cursor-pointer">
+            <label className="flex items-center gap-2 rounded-none border border-border/70 bg-secondary/20 px-3 py-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={allBatchesSelected}
@@ -1535,13 +1535,13 @@ export default function JobPortalPage() {
                     setJobTargetBatchIds([])
                   }
                 }}
-                className="rounded border-border/80 text-primary focus:ring-primary cursor-pointer"
+                className="rounded-none border-border/80 text-primary focus:ring-primary cursor-pointer"
               />
               <span className="text-xs font-medium text-foreground">All Batches</span>
             </label>
 
             {!allBatchesSelected && (
-              <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-lg border border-border/70 bg-card p-2">
+              <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-none border border-border/70 bg-card p-2">
                 {batches.length === 0 ? (
                   <p className="text-[11px] text-muted-foreground px-2 py-3 text-center">
                     No batches found. Create a batch first under Courses.
@@ -1553,7 +1553,7 @@ export default function JobPortalPage() {
                     return (
                       <label
                         key={batchId}
-                        className={`flex items-start gap-2 rounded-md px-2 py-2 cursor-pointer transition-colors ${
+                        className={`flex items-start gap-2 rounded-none px-2 py-2 cursor-pointer transition-colors ${
                           checked ? "bg-primary/5 border border-primary/20" : "hover:bg-muted/40"
                         }`}
                       >
@@ -1561,7 +1561,7 @@ export default function JobPortalPage() {
                           type="checkbox"
                           checked={checked}
                           onChange={() => toggleJobTargetBatch(batchId)}
-                          className="mt-0.5 rounded border-border/80 text-primary focus:ring-primary cursor-pointer"
+                          className="mt-0.5 rounded-none border-border/80 text-primary focus:ring-primary cursor-pointer"
                         />
                         <span className="min-w-0">
                           <span className="block text-xs font-semibold text-foreground">{batch.code}</span>

@@ -183,7 +183,7 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-6 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-primary/10 text-primary">
@@ -203,17 +203,6 @@ export default function CampaignsPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Reached</p>
               <h3 className="text-2xl font-bold">{loading ? "…" : formatReached(stats.totalReached)}</h3>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-green-500/10 text-green-500">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Avg. Open Rate</p>
-              <h3 className="text-2xl font-bold">{loading ? "…" : `${stats.avgOpenRate}%`}</h3>
             </div>
           </CardContent>
         </Card>
@@ -260,20 +249,19 @@ export default function CampaignsPage() {
                   <th className="px-6 py-4 font-medium">Channel</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium">Audience</th>
-                  <th className="px-6 py-4 font-medium">Performance</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                       Loading campaigns…
                     </td>
                   </tr>
                 ) : filteredCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                       {searchTerm ? "No campaigns match your search." : "No campaigns yet. Create your first campaign."}
                     </td>
                   </tr>
@@ -309,24 +297,6 @@ export default function CampaignsPage() {
                           <div className="font-medium">{(campaign.recipientCount || 0).toLocaleString()}</div>
                           <div className="text-xs text-muted-foreground">
                             {AUDIENCE_LABELS[campaign.audience || ""] || "Recipients"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-4 text-xs">
-                            {campaign.status !== "Draft" && campaign.status !== "Scheduled" ? (
-                              <>
-                                <div>
-                                  <div className="font-medium text-foreground">{campaign.openRate ?? 0}%</div>
-                                  <div className="text-muted-foreground">Opened</div>
-                                </div>
-                                <div>
-                                  <div className="font-medium text-foreground">{campaign.clickRate ?? 0}%</div>
-                                  <div className="text-muted-foreground">Clicked</div>
-                                </div>
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">

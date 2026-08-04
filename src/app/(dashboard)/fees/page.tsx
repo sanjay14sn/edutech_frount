@@ -1,8 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CreditCard, IndianRupee, Download, Send, Search, AlertCircle, FileText, Edit2, Trash2, Check } from "lucide-react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { CreditCard, IndianRupee, Download, Search, AlertCircle, FileText, Edit2, Trash2, Check, CheckCircle2, RotateCcw, Plus, Minus, Info, Mail, Sparkles } from "lucide-react"
 import { KPICard } from "@/components/dashboard/KPICard"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -43,7 +42,6 @@ export default function FeesPage() {
   const [loading, setLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [selectedMonth, setSelectedMonth] = React.useState<string>("all")
-  
   // Modal states
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   
@@ -77,6 +75,43 @@ export default function FeesPage() {
   const scheduleMatchesTotal =
     formFullyPaid || Math.abs(formScheduleTotal - formFeesTotalNum) <= 1
   const scheduleDifference = formFeesTotalNum - formScheduleTotal
+
+  const formInstallmentRows = React.useMemo(
+    () =>
+      computeInstallmentRows({
+        feesPaid: formFeesPaidNum,
+        feesTotal: formFeesTotalNum,
+        installmentSchedule: formData.schedule,
+      }),
+    [formFeesPaidNum, formFeesTotalNum, formData.schedule]
+  )
+
+  const lastPaidInstallmentIndex = React.useMemo(() => {
+    let last = -1
+    formInstallmentRows.forEach((row, index) => {
+      if (row.status === "paid") last = index
+    })
+    return last
+  }, [formInstallmentRows])
+
+  const sumPaidThroughIndex = (schedule: InstallmentScheduleItem[], index: number) =>
+    schedule
+      .slice(0, index + 1)
+      .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+
+  const sumPaidBeforeIndex = (schedule: InstallmentScheduleItem[], index: number) =>
+    schedule
+      .slice(0, index)
+      .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+
+  const minInstallments = formHasCollected ? 2 : 1
+  const paymentProgressPercent =
+    formFeesTotalNum > 0 ? Math.min(100, Math.round((formFeesPaidNum / formFeesTotalNum) * 100)) : 0
+  const canRemoveLastInstallment =
+    formData.schedule.length > minInstallments &&
+    formInstallmentRows[formData.schedule.length - 1]?.status !== "paid"
+  const missingDueDates = formData.schedule.filter((item) => !item.dueDate).length
+  const installmentPresets = [2, 3, 4, 6].filter((count) => count >= minInstallments && count <= 12)
 
   const rebuildSchedule = (
     prev: typeof formData,
@@ -165,7 +200,6 @@ export default function FeesPage() {
     })
   }, [students])
 
-  // Dynamically compute unique months from due dates
   const monthsList = React.useMemo(() => {
     const months = new Set<string>()
     installments.forEach(inst => {
@@ -205,24 +239,6 @@ export default function FeesPage() {
     return null
   }, [students, user])
 
-  // Dynamic chart data grouping by course
-  const feeLogs = React.useMemo(() => {
-    const groups: { [course: string]: { Paid: number; Dues: number } } = {}
-    students.forEach(student => {
-      const course = student.course || "Other Courses"
-      if (!groups[course]) {
-        groups[course] = { Paid: 0, Dues: 0 }
-      }
-      groups[course].Paid += student.feesPaid || 0
-      groups[course].Dues += Math.max(0, (student.feesTotal || 0) - (student.feesPaid || 0))
-    })
-    return Object.entries(groups).map(([course, data]) => ({
-      course,
-      Paid: data.Paid,
-      Dues: data.Dues
-    }))
-  }, [students])
-
   const filteredInstallments = installments.filter((item) => {
     const matchesSearch = item.studentName.toLowerCase().includes(searchQuery.toLowerCase())
     if (selectedMonth === "all") return matchesSearch
@@ -258,13 +274,39 @@ export default function FeesPage() {
     alert(`Downloaded invoice receipt: receipt-${id}.pdf successfully!`)
   }
 
-  const handleSendReminder = (name: string) => {
-    addNotification({
-      title: "Dues Reminder Sent",
-      description: `Payment warning SMS & Email dispatched to ${name}.`,
-      type: "fees"
-    })
-    alert(`Reminder dispatched: Payment link sent to ${name}'s contact numbers.`)
+  const [sendingEmails, setSendingEmails] = React.useState(false)
+
+  const handleSendBulkEmailReminders = async () => {
+    try {
+      setSendingEmails(true)
+      const res = await api.sendAllFeeReminderEmails()
+      addNotification({
+        title: "Dues Email Follow-up Sent",
+        description: `Sent automated email alerts to ${res.total} students with outstanding balances.`,
+        type: "fees"
+      })
+      alert(`Successfully sent automated email alerts to ${res.total} students!`)
+    } catch (err: any) {
+      console.error("Failed to send bulk email reminders:", err)
+      alert(err.message || "Failed to send email reminders.")
+    } finally {
+      setSendingEmails(false)
+    }
+  }
+
+  const handleSendIndividualEmailReminder = async (studentId: string, studentName: string) => {
+    try {
+      await api.sendFeeReminderEmails([studentId])
+      addNotification({
+        title: "Follow-up Email Sent",
+        description: `Sent automated payment reminder email to ${studentName}.`,
+        type: "fees"
+      })
+      alert(`Follow-up email reminder sent successfully to ${studentName}!`)
+    } catch (err: any) {
+      console.error("Failed to send individual email reminder:", err)
+      alert(err.message || "Failed to send follow-up email.")
+    }
   }
 
   const handleMarkAsPaid = async (studentId: string, studentName: string) => {
@@ -333,12 +375,27 @@ export default function FeesPage() {
   }
 
   const updateScheduleCount = (count: number) => {
-    const safeCount = Math.max(1, Math.min(12, count))
+    const safeCount = Math.max(minInstallments, Math.min(12, count))
     setFormData((prev) => ({
       ...prev,
       installmentsCount: String(safeCount),
       schedule: rebuildSchedule(prev, { installmentsCount: safeCount }),
     }))
+  }
+
+  const handleAddInstallment = () => {
+    if (formData.schedule.length < 12) {
+      updateScheduleCount(formData.schedule.length + 1)
+    }
+  }
+
+  const handleRemoveLastInstallment = () => {
+    if (!canRemoveLastInstallment) return
+    updateScheduleCount(formData.schedule.length - 1)
+  }
+
+  const applyInstallmentPreset = (count: number) => {
+    updateScheduleCount(count)
   }
 
   const updateScheduleItem = (index: number, field: "amount" | "dueDate" | "label", value: string) => {
@@ -373,6 +430,42 @@ export default function FeesPage() {
       ...prev,
       schedule: rebuildSchedule(prev),
     }))
+  }
+
+  const handleMarkInstallmentPaid = (index: number) => {
+    setFormData((prev) => {
+      const total = Number(prev.feesTotal) || 0
+      const newPaid = Math.min(total, sumPaidThroughIndex(prev.schedule, index))
+      return {
+        ...prev,
+        feesPaid: String(newPaid),
+        schedule: rebuildSchedule(prev, { feesPaid: newPaid }),
+      }
+    })
+  }
+
+  const handleMarkInstallmentUnpaid = (index: number) => {
+    setFormData((prev) => {
+      const newPaid = sumPaidBeforeIndex(prev.schedule, index)
+      return {
+        ...prev,
+        feesPaid: String(newPaid),
+        schedule: rebuildSchedule(prev, { feesPaid: newPaid }),
+      }
+    })
+  }
+
+  const getInstallmentStatusBadge = (status: "paid" | "partial" | "pending" | "overdue") => {
+    switch (status) {
+      case "paid":
+        return <Badge variant="success" className="text-[9px]">Paid</Badge>
+      case "partial":
+        return <Badge variant="warning" className="text-[9px]">Partial</Badge>
+      case "overdue":
+        return <Badge variant="destructive" className="text-[9px]">Overdue</Badge>
+      default:
+        return <Badge variant="secondary" className="text-[9px]">Pending</Badge>
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -545,6 +638,18 @@ export default function FeesPage() {
                 />
               </div>
               
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Mail}
+                onClick={handleSendBulkEmailReminders}
+                disabled={sendingEmails}
+                className="h-8.5 text-xs text-teal-600 border-teal-500/20 bg-teal-500/5 hover:bg-teal-500/10 cursor-pointer w-full sm:w-auto font-semibold flex items-center gap-1.5"
+                title="Send automated email reminders to all outstanding students"
+              >
+                {sendingEmails ? "Sending..." : "Auto Follow-up Dues"}
+              </Button>
+
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
@@ -610,6 +715,16 @@ export default function FeesPage() {
                                 title="Mark as Paid"
                               />
                             )}
+                            {item.status !== "paid" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendIndividualEmailReminder(item.id, item.studentName)}
+                                icon={Mail}
+                                className="h-7 w-7 p-0 text-teal-600 border-teal-500/20 bg-teal-500/5 hover:bg-teal-500/10 cursor-pointer"
+                                title="Send Email Follow-up"
+                              />
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -618,16 +733,6 @@ export default function FeesPage() {
                               className="h-7 w-7 p-0 cursor-pointer"
                               title="Download invoice receipt"
                             />
-                            {item.status !== "paid" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSendReminder(item.studentName)}
-                                icon={Send}
-                                className="h-7 w-7 p-0 text-amber-500 border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer"
-                                title="Dispatch dues reminder"
-                              />
-                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -702,254 +807,429 @@ export default function FeesPage() {
         </CardContent>
       </Card>
 
-      {/* Analytics Chart Row */}
-      {user?.role !== "student" && (
-        <Card className="bg-card">
-          <CardHeader>
-            <CardTitle>Program Revenue Distribution</CardTitle>
-            <CardDescription>Visual breakdown of collected fees vs outstanding student dues by program.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={feeLogs}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="course" stroke="var(--muted-foreground)" fontSize={11} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }} />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="Paid" fill="#10b981" radius={[4, 4, 0, 0]} name="Fees Paid" />
-                <Bar dataKey="Dues" fill="#ef4444" radius={[4, 4, 0, 0]} name="Outstanding Dues" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Edit Installment Dialog Modal */}
       <Dialog
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Edit Installment Details"
         description="Update payment due dates, total course fees, and collected amounts."
+        className="max-w-6xl w-[min(96vw,72rem)]"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">Student Name</label>
-            <input
-              type="text"
-              disabled
-              value={formData.studentName}
-              className="w-full h-9 px-3 rounded-lg border border-border bg-muted/30 text-xs text-muted-foreground focus:outline-hidden cursor-not-allowed"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Total Fees (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                value={formData.feesTotal}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setFormData((prev) => ({
-                    ...prev,
-                    feesTotal: value,
-                    schedule: rebuildSchedule(prev, { feesTotal: Number(value) || 0 }),
-                  }))
-                }}
-                placeholder="e.g. 22000"
-                className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Fees Paid (₹)</label>
-              <input
-                type="number"
-                required
-                min="0"
-                value={formData.feesPaid}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setFormData((prev) => ({
-                    ...prev,
-                    feesPaid: value,
-                    schedule: rebuildSchedule(prev, { feesPaid: Number(value) || 0 }),
-                  }))
-                }}
-                placeholder="e.g. 2300"
-                className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
-              />
-            </div>
-          </div>
-
-          {scholarshipTrackingEnabled && (
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
-              <p className="text-xs font-semibold text-foreground">Scholarship tracking</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Scholarship amount (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.scholarshipAmount}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, scholarshipAmount: e.target.value }))}
-                    className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div className="space-y-1.5 col-span-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Notes</label>
-                  <input
-                    type="text"
-                    value={formData.scholarshipNotes}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, scholarshipNotes: e.target.value }))}
-                    placeholder="Merit scholarship, sibling discount, etc."
-                    className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+          {/* Payment overview */}
+          <div className="rounded-xl border border-border/70 bg-muted/15 p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">Student</p>
+                <p className="text-sm font-bold text-foreground">{formData.studentName}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">Collection progress</p>
+                <p className="text-sm font-bold text-foreground">{paymentProgressPercent}%</p>
               </div>
             </div>
-          )}
-
-          {formFullyPaid ? (
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300">
-              Fully cleared — no due date will be saved.
+            <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${paymentProgressPercent}%` }}
+              />
             </div>
-          ) : (
-            <>
-              {formHasCollected && (
-                <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-xs text-foreground">
-                  {formatCurrency(formFeesPaidNum)} collected
-                  {" · "}
-                  <span className="font-semibold">{formatCurrency(formRemaining)} remaining</span>
-                  {" "}across {Math.max(0, formData.schedule.length - 1)} future installment
-                  {Math.max(0, formData.schedule.length - 1) === 1 ? "" : "s"}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-lg border border-border/50 bg-card px-2 py-2">
+                <p className="text-[10px] text-muted-foreground">Total fees</p>
+                <p className="text-sm font-bold text-foreground">{formatCurrency(formFeesTotalNum)}</p>
+              </div>
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2 py-2">
+                <p className="text-[10px] text-emerald-700 dark:text-emerald-400">Paid</p>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(formFeesPaidNum)}</p>
+              </div>
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-2">
+                <p className="text-[10px] text-amber-700 dark:text-amber-400">Outstanding</p>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-300">{formatCurrency(formRemaining)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(260px,300px)_1fr]">
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border/60 bg-card p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">Fee setup</p>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Total Fees (₹) <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.feesTotal}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setFormData((prev) => ({
+                        ...prev,
+                        feesTotal: value,
+                        schedule: rebuildSchedule(prev, { feesTotal: Number(value) || 0 }),
+                      }))
+                    }}
+                    placeholder="e.g. 25000"
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Full course fee before installments.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Fees Paid (₹) <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.feesPaid}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setFormData((prev) => ({
+                        ...prev,
+                        feesPaid: value,
+                        schedule: rebuildSchedule(prev, { feesPaid: Number(value) || 0 }),
+                      }))
+                    }}
+                    placeholder="e.g. 5000"
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-background text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Or use Mark Paid in the schedule table.</p>
+                </div>
+              </div>
+
+              {scholarshipTrackingEnabled && (
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
+                  <p className="text-xs font-semibold text-foreground">Scholarship (optional)</p>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground">Scholarship amount (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.scholarshipAmount}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, scholarshipAmount: e.target.value }))}
+                        className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+                      <input
+                        type="text"
+                        value={formData.scholarshipNotes}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, scholarshipNotes: e.target.value }))}
+                        placeholder="Merit scholarship, sibling discount, etc."
+                        className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Number of Installments</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="12"
-                    value={formData.installmentsCount}
-                    onChange={(e) => updateScheduleCount(Number(e.target.value) || 1)}
-                    className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
-                  />
+              {formFullyPaid ? (
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+                  Fully cleared — no due date will be saved.
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Schedule Total</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={formatCurrency(formScheduleTotal)}
-                    className={`w-full h-9 px-3 rounded-lg border text-xs cursor-not-allowed ${
-                      scheduleMatchesTotal
-                        ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
-                        : "border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300"
-                    }`}
-                  />
+              ) : (
+                <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2 text-[10px] text-muted-foreground">
+                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 text-primary" />
+                    How to use
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+                    <li>Set total course fees.</li>
+                    <li>Add installments to split the outstanding balance.</li>
+                    <li>Set a due date for each row <span className="text-destructive">*</span>.</li>
+                    <li>Mark Paid when the student pays each installment.</li>
+                  </ol>
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]">
-                <p className={scheduleMatchesTotal ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
-                  {scheduleMatchesTotal
-                    ? formHasCollected
-                      ? `Installment 1 reflects collected fees. Remaining ${formatCurrency(formRemaining)} is split across future dues.`
-                      : `Schedule matches course fees (${formatCurrency(formFeesTotalNum)}).`
-                    : `Off by ${formatCurrency(Math.abs(scheduleDifference))} — adjust amounts or split evenly.`}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-[10px] cursor-pointer"
-                  onClick={handleEvenSplit}
-                >
-                  Split evenly
-                </Button>
-              </div>
-
-              <div className="space-y-2 border-t border-border/40 pt-3">
-                <label className="text-xs font-semibold text-muted-foreground">Installment Schedule</label>
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {formData.schedule.map((item, index) => {
-                    const isCollectedRow = formHasCollected && index === 0
-                    const isAutoRow =
-                      index === formData.schedule.length - 1 && formData.schedule.length > 1
-                    const isEditableAmount = !isCollectedRow && !isAutoRow
-
-                    return (
-                    <div
-                      key={index}
-                      className={`grid grid-cols-12 gap-2 items-end rounded-lg border p-2.5 ${
-                        isCollectedRow
-                          ? "border-emerald-500/30 bg-emerald-500/5"
-                          : "border-border/70 bg-muted/10"
-                      }`}
-                    >
-                      <div className="col-span-12 sm:col-span-4 space-y-1">
-                        <label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                          Installment {index + 1}
-                          {isCollectedRow && (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Collected</span>
-                          )}
-                        </label>
-                        <input
-                          type="text"
-                          value={item.label || getInstallmentLabel(index, formData.schedule.length)}
-                          onChange={(e) => updateScheduleItem(index, "label", e.target.value)}
-                          className="w-full h-8 px-2 rounded-md border border-border bg-card text-[11px]"
-                        />
+            <div className="space-y-3 min-w-0">
+              {formFullyPaid ? (
+                <div className="flex h-full min-h-[220px] items-center justify-center rounded-xl border border-dashed border-emerald-500/30 bg-emerald-500/5 px-4 text-center">
+                  <div>
+                    <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
+                    <p className="text-sm font-semibold text-foreground">All installments cleared</p>
+                    <p className="text-xs text-muted-foreground mt-1">This student has paid the full course fee.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-xl border border-border/70 bg-muted/10 p-3 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Installment plan</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {formHasCollected
+                            ? `₹${formRemaining.toLocaleString("en-IN")} outstanding — add more rows to split into smaller dues.`
+                            : "Split course fees across multiple payment dates."}
+                        </p>
                       </div>
-                      <div className="col-span-6 sm:col-span-4 space-y-1">
-                        <label className="text-[10px] text-muted-foreground">
-                          Amount (₹)
-                          {isCollectedRow && (
-                            <span className="text-emerald-600 dark:text-emerald-400"> · paid</span>
-                          )}
-                          {isAutoRow && (
-                            <span className="text-muted-foreground/70"> · auto</span>
-                          )}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.amount}
-                          readOnly={!isEditableAmount}
-                          onChange={(e) => updateScheduleItem(index, "amount", e.target.value)}
-                          className={`w-full h-8 px-2 rounded-md border border-border text-[11px] ${
-                            !isEditableAmount
-                              ? "bg-muted/30 text-muted-foreground cursor-not-allowed"
-                              : "bg-card"
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-1 rounded-md border ${
+                            scheduleMatchesTotal
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
                           }`}
-                        />
-                      </div>
-                      <div className="col-span-6 sm:col-span-4 space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Due Date</label>
-                        <input
-                          type="date"
-                          value={item.dueDate}
-                          onChange={(e) => updateScheduleItem(index, "dueDate", e.target.value)}
-                          className="w-full h-8 px-2 rounded-md border border-border bg-card text-[11px]"
-                        />
+                        >
+                          Total: {formatCurrency(formScheduleTotal)}
+                        </span>
                       </div>
                     </div>
-                    )
-                  })}
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  {formHasCollected
-                    ? `Installment 1 is locked to fees collected (${formatCurrency(formFeesPaidNum)}). Edit future installment amounts — the last row auto-balances the remaining ${formatCurrency(formRemaining)}.`
-                    : "Edit amounts for installments 1 to n-1 — the last installment adjusts automatically so the total always equals course fees."}
-                </p>
-              </div>
-            </>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center rounded-lg border border-border bg-card overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => updateScheduleCount(formData.schedule.length - 1)}
+                          disabled={formData.schedule.length <= minInstallments}
+                          className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          title="Remove installment"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="px-3 text-xs font-bold text-foreground min-w-[3rem] text-center">
+                          {formData.schedule.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAddInstallment}
+                          disabled={formData.schedule.length >= 12}
+                          className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          title="Add installment"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        {installmentPresets.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => applyInstallmentPreset(preset)}
+                            className={`h-8 px-2.5 rounded-lg border text-[10px] font-semibold transition-colors cursor-pointer ${
+                              formData.schedule.length === preset
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {preset} payments
+                          </button>
+                        ))}
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-[10px] gap-1 cursor-pointer"
+                        icon={Plus}
+                        onClick={handleAddInstallment}
+                        disabled={formData.schedule.length >= 12}
+                      >
+                        Add installment
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-[10px] cursor-pointer"
+                        onClick={handleEvenSplit}
+                      >
+                        {formHasCollected ? "Split remaining" : "Split evenly"}
+                      </Button>
+                    </div>
+
+                    {!scheduleMatchesTotal && (
+                      <p className="text-[10px] text-red-600 dark:text-red-400">
+                        Schedule is off by {formatCurrency(Math.abs(scheduleDifference))}. Adjust amounts or tap Split.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-semibold text-foreground">
+                      Payment schedule <span className="text-destructive">*</span>
+                    </label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formInstallmentRows.filter((row) => row.status === "paid").length} of {formData.schedule.length} paid
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl border border-border/70 overflow-hidden">
+                    <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="border-b border-border/60 bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-semibold w-10">#</th>
+                            <th className="px-3 py-2 text-left font-semibold min-w-[120px]">Label</th>
+                            <th className="px-3 py-2 text-left font-semibold min-w-[100px]">Amount (₹)</th>
+                            <th className="px-3 py-2 text-left font-semibold min-w-[130px]">
+                              Due date <span className="text-destructive">*</span>
+                            </th>
+                            <th className="px-3 py-2 text-left font-semibold w-20">Status</th>
+                            <th className="px-3 py-2 text-right font-semibold min-w-[120px]">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {formData.schedule.map((item, index) => {
+                            const row = formInstallmentRows[index]
+                            const isCollectedRow = formHasCollected && index === 0
+                            const isAutoRow =
+                              index === formData.schedule.length - 1 && formData.schedule.length > 1
+                            const isEditableAmount = !isCollectedRow && !isAutoRow
+                            const isPaid = row?.status === "paid"
+                            const canUnmark = isPaid && index === lastPaidInstallmentIndex
+                            const dueDateMissing = !item.dueDate
+
+                            return (
+                              <tr
+                                key={index}
+                                className={
+                                  isPaid
+                                    ? "bg-emerald-500/5"
+                                    : row?.status === "overdue"
+                                      ? "bg-destructive/5"
+                                      : "bg-card"
+                                }
+                              >
+                                <td className="px-3 py-2.5 font-mono text-muted-foreground">{index + 1}</td>
+                                <td className="px-3 py-2.5">
+                                  <input
+                                    type="text"
+                                    value={item.label || getInstallmentLabel(index, formData.schedule.length)}
+                                    onChange={(e) => updateScheduleItem(index, "label", e.target.value)}
+                                    placeholder="e.g. Admission Fee"
+                                    className="w-full h-8 px-2 rounded-md border border-border bg-card text-[11px]"
+                                  />
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.amount}
+                                    readOnly={!isEditableAmount}
+                                    onChange={(e) => updateScheduleItem(index, "amount", e.target.value)}
+                                    title={
+                                      isCollectedRow
+                                        ? "Locked to collected fees"
+                                        : isAutoRow
+                                          ? "Auto-balanced to match total fees"
+                                          : "Editable amount"
+                                    }
+                                    className={`w-full h-8 px-2 rounded-md border text-[11px] ${
+                                      !isEditableAmount
+                                        ? "border-border/50 bg-muted/30 text-muted-foreground cursor-not-allowed"
+                                        : "border-border bg-card"
+                                    }`}
+                                  />
+                                  {isCollectedRow && (
+                                    <p className="text-[9px] text-emerald-600 mt-0.5">Collected</p>
+                                  )}
+                                  {isAutoRow && (
+                                    <p className="text-[9px] text-muted-foreground mt-0.5">Auto balance</p>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <input
+                                    type="date"
+                                    required
+                                    value={item.dueDate}
+                                    onChange={(e) => updateScheduleItem(index, "dueDate", e.target.value)}
+                                    className={`w-full h-8 px-2 rounded-md border bg-card text-[11px] ${
+                                      dueDateMissing
+                                        ? "border-amber-500/50 ring-1 ring-amber-500/20"
+                                        : "border-border"
+                                    }`}
+                                  />
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  {row ? getInstallmentStatusBadge(row.status) : null}
+                                </td>
+                                <td className="px-3 py-2.5 text-right">
+                                  {isPaid ? (
+                                    canUnmark ? (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-[10px] gap-1 cursor-pointer"
+                                        onClick={() => handleMarkInstallmentUnpaid(index)}
+                                      >
+                                        <RotateCcw className="h-3 w-3" />
+                                        Unmark
+                                      </Button>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                                        <Check className="h-3 w-3" />
+                                        Paid
+                                      </span>
+                                    )
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      variant="primary"
+                                      size="sm"
+                                      className="h-7 text-[10px] gap-1 cursor-pointer"
+                                      onClick={() => handleMarkInstallmentPaid(index)}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Mark Paid
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {canRemoveLastInstallment && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLastInstallment}
+                      className="text-[10px] font-semibold text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                    >
+                      Remove last unpaid installment
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {!formFullyPaid && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-[10px] ${
+                scheduleMatchesTotal && missingDueDates === 0
+                  ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+                  : "border-amber-500/20 bg-amber-500/5 text-amber-800 dark:text-amber-300"
+              }`}
+            >
+              {scheduleMatchesTotal && missingDueDates === 0 ? (
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Ready to save — schedule matches fees and all due dates are set.
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Before saving:{" "}
+                  {!scheduleMatchesTotal && "installment total must match course fees. "}
+                  {missingDueDates > 0 && `${missingDueDates} installment(s) need a due date.`}
+                </span>
+              )}
+            </div>
           )}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-border/40">

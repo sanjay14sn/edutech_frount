@@ -1,10 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { AnimatePresence } from "framer-motion"
 import { 
-  GitPullRequest, List, KanbanSquare, Search, Plus, Filter, UserCheck, 
-  Trash2, FileEdit, CheckCircle2, AlertCircle, Phone, Mail, DollarSign, Calendar, MessageSquarePlus, Clock, X, Upload, Download, FileSpreadsheet
+  GitPullRequest, Search, Plus, Filter, UserCheck, 
+  Trash2, FileEdit, CheckCircle2, AlertCircle, Phone, Mail, DollarSign, Calendar, MessageSquarePlus, Clock, X, Upload, Download, FileSpreadsheet, MessageCircle, Link2, Sparkles
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -19,6 +19,8 @@ import { downloadLeadImportTemplate, parseLeadImportCsv, type LeadImportRow } fr
 import { useCenterPolicy } from "@/hooks/useCenterPolicy"
 import { CapacityLimitNotice, showCapacityLimitToast } from "@/components/shared/CapacityLimitNotice"
 import { ApiError } from "@/lib/api"
+import LeadChatDrawer from "@/components/crm/LeadChatDrawer"
+import LeadIntegrationsDialog from "@/components/crm/LeadIntegrationsDialog"
 
 const STAGES: { value: LeadStage; label: string; color: "default" | "secondary" | "success" | "warning" | "destructive" | "info" | "outline" }[] = [
   { value: "new", label: "New Lead", color: "default" },
@@ -54,8 +56,7 @@ export default function CRMPage() {
   
   const [bdes, setBdes] = React.useState<any[]>([])
   const [courses, setCourses] = React.useState<any[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [viewType, setViewType] = React.useState<"board" | "list">("list")
+  const [pageLoading, setPageLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [filterCourse, setFilterCourse] = React.useState("all")
 
@@ -106,31 +107,45 @@ export default function CRMPage() {
     failedRows?: Array<{ row: number; reason: string }>
   } | null>(null)
   const importFileInputRef = React.useRef<HTMLInputElement>(null)
+  const [chatLead, setChatLead] = React.useState<Lead | null>(null)
+  const [globalAutoReply, setGlobalAutoReply] = React.useState(true)
+  const [globalFollowUps, setGlobalFollowUps] = React.useState(true)
+  const [settingsSaving, setSettingsSaving] = React.useState<"autoReply" | "followUps" | null>(null)
+  const [isIntegrationsOpen, setIsIntegrationsOpen] = React.useState(false)
 
   React.useEffect(() => {
     const fetchInitialData = async () => {
+      setPageLoading(true)
       try {
-        setLoading(true)
-        const requestsData = await api.getConversionRequests().catch(() => [])
-        const [leadsData, bdesData, coursesData] = await Promise.all([
-          api.getLeads(),
+        const [requestsData, leadsData, bdesData, coursesData, chatbotSettings] = await Promise.all([
+          api.getConversionRequests().catch(() => []),
+          api.getLeads().catch((err) => {
+            console.warn("Failed to load leads:", err instanceof Error ? err.message : err)
+            return []
+          }),
           api.getBdes().catch(() => []),
           api.getCourses().catch(() => []),
+          api.getLeadChatbotSettings().catch(() => ({
+            autoReplyEnabled: true,
+            followUpsEnabled: true,
+          })),
         ])
-        setLeads(leadsData)
-        setBdes(bdesData)
-        setCourses(coursesData)
-        setConversionRequests(requestsData)
-        if (coursesData.length > 0) {
+        setLeads(Array.isArray(leadsData) ? leadsData : [])
+        setBdes(Array.isArray(bdesData) ? bdesData : [])
+        setCourses(Array.isArray(coursesData) ? coursesData : [])
+        setConversionRequests(Array.isArray(requestsData) ? requestsData : [])
+        setGlobalAutoReply(chatbotSettings?.autoReplyEnabled !== false)
+        setGlobalFollowUps(chatbotSettings?.followUpsEnabled !== false)
+        if (Array.isArray(coursesData) && coursesData.length > 0) {
           setNewCourse(coursesData[0].name)
         }
       } catch (err) {
-        console.error("Failed to load CRM data:", err)
+        console.warn("Failed to load CRM data:", err instanceof Error ? err.message : String(err))
       } finally {
-        setLoading(false)
+        setPageLoading(false)
       }
     }
-    fetchInitialData()
+    void fetchInitialData()
   }, [setLeads])
 
   React.useEffect(() => {
@@ -217,6 +232,27 @@ export default function CRMPage() {
     }
     if (lead.counsellor?.trim()) return lead.counsellor.trim()
     return "Unassigned"
+  }
+
+  const handleGlobalChatbotToggle = async (
+    field: "autoReplyEnabled" | "followUpsEnabled",
+    value: boolean
+  ) => {
+    if (!isOwner) return
+    const prevAuto = globalAutoReply
+    const prevFollow = globalFollowUps
+    if (field === "autoReplyEnabled") setGlobalAutoReply(value)
+    else setGlobalFollowUps(value)
+    setSettingsSaving(field === "autoReplyEnabled" ? "autoReply" : "followUps")
+    try {
+      await api.updateLeadChatbotSettings({ [field]: value })
+    } catch (err) {
+      setGlobalAutoReply(prevAuto)
+      setGlobalFollowUps(prevFollow)
+      console.warn("Failed to update chatbot settings:", err instanceof Error ? err.message : err)
+    } finally {
+      setSettingsSaving(null)
+    }
   }
 
   // CRUD actions
@@ -617,6 +653,22 @@ export default function CRMPage() {
     }
   }
 
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
+        <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <p className="text-xs text-muted-foreground">Loading leads CRM board...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Panel */}
@@ -628,32 +680,60 @@ export default function CRMPage() {
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {isBde
-              ? "Move leads through the pipeline. Choosing Request Conversion sends enrollment details to the owner for approval."
-              : "Manage your intake pipeline. Drag cards or switch stages to update student leads."}
+              ? "Manage your leads. Choosing Request Conversion sends enrollment details to the owner for approval."
+              : "Manage your intake pipeline. Update stages to move student leads forward."}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View Toggles */}
-          <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
-            <button
-              onClick={() => setViewType("board")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold cursor-pointer ${
-                viewType === "board" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <KanbanSquare className="h-3.5 w-3.5" />
-              <span>Pipeline</span>
-            </button>
-            <button
-              onClick={() => setViewType("list")}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold cursor-pointer ${
-                viewType === "list" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-              <span>Table</span>
-            </button>
+          <div className="inline-flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">Auto Reply</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={globalAutoReply}
+                disabled={!isOwner || settingsSaving === "autoReply"}
+                title={isOwner ? (globalAutoReply ? "Auto reply on for all leads" : "Auto reply off") : "Owner only"}
+                onClick={() => void handleGlobalChatbotToggle("autoReplyEnabled", !globalAutoReply)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  globalAutoReply ? "bg-teal-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    globalAutoReply ? "translate-x-[18px]" : "translate-x-[2px]"
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">Follow-ups</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={globalFollowUps}
+                disabled={!isOwner || settingsSaving === "followUps"}
+                title={isOwner ? (globalFollowUps ? "Follow-ups on for all leads" : "Follow-ups off") : "Owner only"}
+                onClick={() => void handleGlobalChatbotToggle("followUpsEnabled", !globalFollowUps)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                  globalFollowUps ? "bg-indigo-600" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    globalFollowUps ? "translate-x-[18px]" : "translate-x-[2px]"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
+
+          {isOwner && (
+            <Button variant="outline" size="sm" icon={Link2} onClick={() => setIsIntegrationsOpen(true)}>
+              Integrations
+            </Button>
+          )}
 
           {allowLeadCsvImport && (
             <Button variant="outline" size="sm" icon={Upload} onClick={() => { resetImportDialog(); setIsImportOpen(true) }}>
@@ -753,80 +833,8 @@ export default function CRMPage() {
         </div>
       </div>
 
-      {/* Main CRM Workspace (Kanban vs Table) */}
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="h-6 w-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="relative">
-          {viewType === "board" ? (
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
-              {pipelineStages.map((column) => {
-                const stageLeads = filteredLeads.filter((l) => getEffectiveStage(l) === column.value)
-                const stageValue = stageLeads.reduce((acc, curr) => acc + curr.value, 0)
-                
-                return (
-                  <div key={column.value} className="flex-1 min-w-[260px] bg-muted/20 border border-border/60 rounded-xl p-3.5 flex flex-col max-h-[70vh]">
-                    {/* Column Header */}
-                    <div className="flex items-center justify-between pb-3.5 border-b border-border/40 mb-3">
-                      <div>
-                        <h3 className="text-xs font-bold text-foreground">{column.label}</h3>
-                        <span className="text-[10px] text-muted-foreground leading-normal mt-0.5">
-                          {formatCurrency(stageValue)} • {stageLeads.length} leads
-                        </span>
-                      </div>
-                      <Badge variant={column.color} className="text-[9px] scale-90">
-                        {stageLeads.length}
-                      </Badge>
-                    </div>
-
-                    {/* Column Lead Cards */}
-                    <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
-                      {stageLeads.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-border/80 rounded-lg text-[10px] text-muted-foreground">
-                          No leads in stage
-                        </div>
-                      ) : (
-                        stageLeads.map((lead) => (
-                          <motion.div
-                            layoutId={lead.id}
-                            key={lead.id}
-                            onClick={() => setSelectedLead(lead)}
-                            className="bg-card hover:bg-card/85 p-3 rounded-lg border border-border/80 shadow-2xs hover:shadow-xs transition-all cursor-pointer space-y-2"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <span className="text-xs font-bold text-foreground truncate max-w-[80%]">
-                                {lead.name}
-                              </span>
-                              <div className="flex flex-col items-end gap-1 shrink-0">
-                                {pendingLeadIds.has(String(lead.id)) && (
-                                  <Badge variant="warning" className="text-[8px] uppercase">Pending</Badge>
-                                )}
-                                <span className="text-[10px] font-semibold text-emerald-500">
-                                  {formatCurrency(lead.value)}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <p className="text-[10px] text-muted-foreground truncate leading-normal">
-                              {lead.course}
-                            </p>
-
-                            <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[9px] text-muted-foreground">
-                              <span className="truncate">BDE: {getBdeNameForLead(lead)}</span>
-                              <span>{formatDate(lead.createdAt || lead.createdDate)}</span>
-                            </div>
-                          </motion.div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            /* Leads List Table View */
+      {/* Leads table */}
+      <div className="relative">
             <Card className="bg-card">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -835,18 +843,19 @@ export default function CRMPage() {
                       <tr className="border-b border-border text-muted-foreground uppercase font-semibold">
                         <th className="p-4">Lead Name</th>
                         <th className="p-4">Contact</th>
+                        <th className="p-4">Source</th>
                         <th className="p-4">Course Enquired</th>
                         <th className="p-4">Intake Value</th>
                         <th className="p-4">Stage</th>
                         <th className="p-4">BDE</th>
                         <th className="p-4">Registration</th>
-                        {isOwner && <th className="p-4 text-right">Actions</th>}
+                        <th className="p-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
                       {filteredLeads.length === 0 ? (
                         <tr>
-                          <td colSpan={isOwner ? 8 : 7} className="py-12 text-center text-muted-foreground">
+                          <td colSpan={9} className="py-12 text-center text-muted-foreground">
                             No lead records found.
                           </td>
                         </tr>
@@ -855,16 +864,35 @@ export default function CRMPage() {
                           const stage = getEffectiveStage(lead)
                           const stageMeta = getStageMeta(stage)
                           const pendingRequest = getPendingRequestForLead(lead.id)
+                          const replyCount = Array.isArray(lead.incomingReplies) ? lead.incomingReplies.length : 0
                           return (
                           <tr 
                             key={lead.id} 
                             onClick={() => setSelectedLead(lead)}
                             className="hover:bg-muted/40 cursor-pointer transition-colors"
                           >
-                            <td className="p-4 font-bold text-foreground">{lead.name}</td>
+                            <td className="p-4 font-bold text-foreground">
+                              <div className="flex flex-col gap-1">
+                                <span>{lead.name}</span>
+                                {lead.outreachSentAt && (
+                                  <span className="text-[10px] font-normal text-teal-600">
+                                    {lead.repliedAt || replyCount > 0 ? "AI chat active" : "Outreach sent"}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-4 space-y-0.5 text-muted-foreground">
                               <p className="flex items-center gap-1"><Mail className="h-3 w-3" /> {lead.email}</p>
                               <p className="flex items-center gap-1"><Phone className="h-3 w-3" /> {lead.phone}</p>
+                            </td>
+                            <td className="p-4">
+                              {lead.source ? (
+                                <span className="inline-flex px-2 py-0.5 rounded-full bg-muted text-[10px] font-semibold text-foreground capitalize">
+                                  {lead.source}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">—</span>
+                              )}
                             </td>
                             <td className="p-4 text-foreground">{lead.course}</td>
                             <td className="p-4 font-semibold text-foreground">{formatCurrency(lead.value)}</td>
@@ -875,10 +903,23 @@ export default function CRMPage() {
                             </td>
                             <td className="p-4 text-muted-foreground">{getBdeNameForLead(lead)}</td>
                             <td className="p-4 text-muted-foreground">{formatDate(lead.createdAt || lead.createdDate)}</td>
-                            {isOwner && (
-                              <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                {pendingRequest ? (
-                                  <div className="flex justify-end gap-1.5">
+                            <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  title="Email chatbot"
+                                  onClick={() => setChatLead(lead)}
+                                  className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border hover:bg-muted text-teal-600"
+                                >
+                                  <MessageCircle className="h-4 w-4" />
+                                  {replyCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center">
+                                      {replyCount}
+                                    </span>
+                                  )}
+                                </button>
+                                {isOwner && pendingRequest ? (
+                                  <>
                                     <Button
                                       variant="primary"
                                       size="sm"
@@ -897,12 +938,10 @@ export default function CRMPage() {
                                     >
                                       Reject
                                     </Button>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                            )}
+                                  </>
+                                ) : null}
+                              </div>
+                            </td>
                           </tr>
                         )})
                       )}
@@ -911,9 +950,7 @@ export default function CRMPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
         </div>
-      )}
 
       {/* Lead details Drawer Overlay */}
       <AnimatePresence>
@@ -945,9 +982,13 @@ export default function CRMPage() {
                     <span className="text-[10px] text-muted-foreground font-semibold uppercase">Phone</span>
                     <p className="font-medium flex items-center gap-1"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {selectedLead.phone}</p>
                   </div>
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1">
                     <span className="text-[10px] text-muted-foreground font-semibold uppercase">Course Interest</span>
                     <p className="font-medium text-foreground">{selectedLead.course}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase">Source</span>
+                    <p className="font-medium text-foreground capitalize">{selectedLead.source || "—"}</p>
                   </div>
                 </div>
 
@@ -1025,6 +1066,120 @@ export default function CRMPage() {
                 </div>
               </div>
 
+               {/* AI Pipeline Widget */}
+              {(() => {
+                const hasOutreachSent = !!selectedLead.outreachSentAt || selectedLead.notes?.some(n => n.text.toLowerCase().includes("outreach email sent") || n.text.toLowerCase().includes("outreach sent"));
+                const outreachSentNote = selectedLead.notes?.find(n => n.text.toLowerCase().includes("outreach email sent") || n.text.toLowerCase().includes("outreach sent"));
+                const outreachDate = selectedLead.outreachSentAt || outreachSentNote?.date;
+
+                const hasFollowUpSent = selectedLead.notes?.some(n => n.text.toLowerCase().includes("auto follow-up"));
+                const followUpNote = selectedLead.notes?.find(n => n.text.toLowerCase().includes("auto follow-up"));
+                const followUpDate = followUpNote?.date;
+
+                const hasReplied = !!selectedLead.repliedAt || (selectedLead.incomingReplies && selectedLead.incomingReplies.length > 0) || selectedLead.notes?.some(n => n.text.toLowerCase().includes("replied") || n.text.toLowerCase().includes("reply received"));
+                const replyNote = selectedLead.notes?.find(n => n.text.toLowerCase().includes("replied") || n.text.toLowerCase().includes("reply received"));
+                const replyDate = selectedLead.repliedAt || replyNote?.date || selectedLead.incomingReplies?.[0]?.receivedAt;
+
+                let progressWidth = "0%";
+                if (hasReplied) progressWidth = "100%";
+                else if (hasFollowUpSent) progressWidth = "66%";
+                else if (hasOutreachSent) progressWidth = "33%";
+
+                return (
+                  <div className="border-t border-border/40 pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="h-3.5 w-3.5 text-teal-500 animate-pulse animate-duration-1000" />
+                        <span>AI Outreach Pipeline</span>
+                      </span>
+                      {selectedLead.intentScore !== undefined && (
+                        <span className="text-[9px] font-semibold bg-teal-500/10 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full">
+                          Intent: {selectedLead.intentScore}%
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="bg-teal-500/5 dark:bg-teal-950/20 rounded-xl border border-teal-500/15 p-3.5 space-y-4">
+                      {/* Step Progress Line */}
+                      <div className="relative flex justify-between items-start">
+                        {/* Background Progress Track Line */}
+                        <div className="absolute top-3.5 left-4 right-4 h-0.5 bg-muted/60 dark:bg-muted/30 -z-10" />
+                        {/* Active Progress Track Line */}
+                        <div 
+                          className="absolute top-3.5 left-4 h-0.5 bg-teal-500 dark:bg-teal-400 -z-10 transition-all duration-500" 
+                          style={{ width: `calc(${progressWidth} - 2rem)` }}
+                        />
+
+                        {/* Step 1: Outreach */}
+                        <div className="flex flex-col items-center text-center space-y-1 flex-1">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-[10px] font-bold transition-all ${
+                            hasOutreachSent 
+                              ? "bg-teal-500 border-teal-500 text-white shadow-md shadow-teal-500/20" 
+                              : "bg-card border-muted-foreground/30 text-muted-foreground"
+                          }`}>
+                            {hasOutreachSent ? "✓" : "1"}
+                          </div>
+                          <span className="text-[9px] font-bold text-foreground">Outreach</span>
+                          {outreachDate && (
+                            <span className="text-[8px] text-muted-foreground/80 leading-none">{formatDate(outreachDate)}</span>
+                          )}
+                        </div>
+
+                        {/* Step 2: Auto Follow-up */}
+                        <div className="flex flex-col items-center text-center space-y-1 flex-1">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-[10px] font-bold transition-all ${
+                            hasFollowUpSent 
+                              ? "bg-teal-500 border-teal-500 text-white shadow-md shadow-teal-500/20" 
+                              : "bg-card border-muted-foreground/30 text-muted-foreground"
+                          }`}>
+                            {hasFollowUpSent ? "✓" : "2"}
+                          </div>
+                          <span className="text-[9px] font-bold text-foreground">Follow-up</span>
+                          {followUpDate && (
+                            <span className="text-[8px] text-muted-foreground/80 leading-none">{formatDate(followUpDate)}</span>
+                          )}
+                        </div>
+
+                        {/* Step 3: Response */}
+                        <div className="flex flex-col items-center text-center space-y-1 flex-1">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-[10px] font-bold transition-all ${
+                            hasReplied 
+                              ? "bg-teal-500 border-teal-500 text-white shadow-md shadow-teal-500/20" 
+                              : "bg-card border-muted-foreground/30 text-muted-foreground"
+                          }`}>
+                            {hasReplied ? "✓" : "3"}
+                          </div>
+                          <span className="text-[9px] font-bold text-foreground">Response</span>
+                          {replyDate && (
+                            <span className="text-[8px] text-muted-foreground/80 leading-none">{formatDate(replyDate)}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Intent score & Last Intent */}
+                      {(selectedLead.lastIntent || selectedLead.intentScore !== undefined) && (
+                        <div className="border-t border-teal-500/10 pt-2.5 flex items-center justify-between text-[10px] text-foreground font-medium">
+                          {selectedLead.lastIntent && (
+                            <span className="flex items-center gap-1 capitalize">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                              Intent: <strong className="text-teal-600 dark:text-teal-400">{selectedLead.lastIntent}</strong>
+                            </span>
+                          )}
+                          {selectedLead.intentScore !== undefined && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-muted-foreground">Confidence:</span>
+                              <div className="w-16 h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden">
+                                <div className="h-full bg-teal-500" style={{ width: `${selectedLead.intentScore}%` }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Note taking Timeline */}
               <div className="border-t border-border/60 pt-4 space-y-3">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -1095,14 +1250,22 @@ export default function CRMPage() {
               )
             })()}
 
-            {/* Danger Zone deletion */}
             <div className="border-t border-border/80 pt-4 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChatLead(selectedLead)}
+                icon={MessageCircle}
+                className="flex-1 text-xs"
+              >
+                Email Chat
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => handleDeleteLead(selectedLead.id)}
                 icon={Trash2}
-                className="w-full text-xs"
+                className="flex-1 text-xs"
               >
                 Delete Lead
               </Button>
@@ -1110,6 +1273,31 @@ export default function CRMPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {chatLead && (
+        <LeadChatDrawer
+          leadId={leadRecordId(chatLead)}
+          leadName={chatLead.name}
+          onClose={() => setChatLead(null)}
+          onUpdated={async () => {
+            try {
+              const leadsData = await api.getLeads()
+              setLeads(leadsData)
+            } catch {
+              /* ignore */
+            }
+          }}
+        />
+      )}
+
+      {isOwner && (
+        <LeadIntegrationsDialog
+          isOpen={isIntegrationsOpen}
+          onClose={() => setIsIntegrationsOpen(false)}
+          bdes={bdes}
+          courses={courses}
+        />
+      )}
 
       {/* Convert Lead Dialog */}
       <Dialog

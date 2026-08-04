@@ -97,6 +97,22 @@ export interface CenterConfig {
   requireOwnerTwoFactor: boolean
   dataRetentionDays: number
   ipWhitelist: string
+
+  // Lead Chatbot Configuration
+  leadChatbotEnabled: boolean
+  leadChatbotAutoOutreach: boolean
+  leadChatbotInboundEnabled: boolean
+  mailHost: string
+  mailPort: number
+  mailSecure: boolean
+  mailUsername: string
+  mailPassword: string
+  mailFrom: string
+  googleClientId: string
+  googleClientSecret: string
+  googleRedirectUri: string
+  googleRefreshToken: string
+  autoAiReply: boolean
 }
 
 export const DEFAULT_CENTER_CONFIG: CenterConfig = {
@@ -186,6 +202,22 @@ export const DEFAULT_CENTER_CONFIG: CenterConfig = {
   requireOwnerTwoFactor: false,
   dataRetentionDays: 365,
   ipWhitelist: "",
+
+  // Chatbot config defaults
+  leadChatbotEnabled: true,
+  leadChatbotAutoOutreach: true,
+  leadChatbotInboundEnabled: true,
+  mailHost: "",
+  mailPort: 587,
+  mailSecure: false,
+  mailUsername: "",
+  mailPassword: "",
+  mailFrom: "",
+  googleClientId: "",
+  googleClientSecret: "",
+  googleRedirectUri: "",
+  googleRefreshToken: "",
+  autoAiReply: true,
 }
 
 export function centerFromApi(data: Record<string, unknown>): CenterConfig {
@@ -211,6 +243,7 @@ export const CONFIG_TABS = [
   { id: "access", label: "Access & limits", description: "Roles, caps, and feature gates" },
   { id: "branding", label: "Branding", description: "Visual identity and public links" },
   { id: "notifications", label: "Notifications", description: "Email, SMS, and alert channels" },
+  { id: "chatbot", label: "Lead Chatbot", description: "SMTP and Google OAuth settings for automated AI outreach" },
   { id: "billing", label: "Billing & tax", description: "Currency, gateway, and invoicing" },
   { id: "attendance", label: "Attendance", description: "Class rules and geofencing" },
   { id: "security", label: "Security", description: "Sessions, passwords, and access control" },

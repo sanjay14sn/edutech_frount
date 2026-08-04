@@ -19,6 +19,7 @@ import {
   Briefcase,
   BarChart3,
   Upload,
+  Bot,
   type LucideIcon,
 } from "lucide-react"
 import { Input } from "@/components/ui/Input"
@@ -48,6 +49,7 @@ const TAB_ICONS: Record<ConfigTabId, LucideIcon> = {
   access: Shield,
   branding: Palette,
   notifications: Bell,
+  chatbot: Bot,
   billing: CreditCard,
   attendance: CalendarCheck,
   security: Lock,
@@ -499,6 +501,129 @@ export function CenterConfigTabs({ activeTab, setActiveTab, config, updateConfig
               <SettingsDivider />
               <SettingsSwitch label="Require 2FA for owners" checked={config.requireOwnerTwoFactor} onChange={(v) => updateConfig({ requireOwnerTwoFactor: v })} />
             </SettingsSection>
+          )}
+
+          {activeTab === "chatbot" && (
+            <>
+              <SettingsSection title="Lead Chatbot Configuration" description="Enable or disable the AI chatbot capabilities for this center. Fields left blank will automatically use the global system defaults configured in the backend .env file.">
+                <SettingsSwitch
+                  label="Lead Chatbot Enabled"
+                  description="Enables automated email communications for new and existing leads."
+                  checked={config.leadChatbotEnabled}
+                  onChange={(v) => updateConfig({ leadChatbotEnabled: v })}
+                />
+                <SettingsSwitch
+                  label="Auto Outreach"
+                  description="Automatically send an initial AI outreach email to newly registered leads."
+                  checked={config.leadChatbotAutoOutreach}
+                  onChange={(v) => updateConfig({ leadChatbotAutoOutreach: v })}
+                />
+                <SettingsSwitch
+                  label="Inbound Lead Email Sync"
+                  description="Scan the configured inbox and automatically import new inquiry emails as CRM leads."
+                  checked={config.leadChatbotInboundEnabled}
+                  onChange={(v) => updateConfig({ leadChatbotInboundEnabled: v })}
+                />
+                <SettingsSwitch
+                  label="Auto AI Reply"
+                  description="Automatically generate and send AI replies to emails received from leads."
+                  checked={config.autoAiReply}
+                  onChange={(v) => updateConfig({ autoAiReply: v })}
+                />
+              </SettingsSection>
+
+              <SettingsSection title="SMTP Settings" description="Outgoing mail server credentials for sending campaign and outreach emails.">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <SettingsField label="Mail Host" hint="SMTP server host (e.g. smtp.gmail.com)">
+                    <Input
+                      value={config.mailHost}
+                      onChange={(e) => updateConfig({ mailHost: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="smtp.gmail.com"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Mail Port" hint="SMTP server port (e.g. 587 or 465)">
+                    <Input
+                      type="number"
+                      value={config.mailPort}
+                      onChange={(e) => updateConfig({ mailPort: Number(e.target.value) || 587 })}
+                      className={fieldInputClass}
+                      placeholder="587"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Mail Username" hint="Username or email address used to authenticate">
+                    <Input
+                      value={config.mailUsername}
+                      onChange={(e) => updateConfig({ mailUsername: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="user@example.com"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Mail Password" hint="Password or app-specific password used to authenticate">
+                    <Input
+                      type="password"
+                      value={config.mailPassword}
+                      onChange={(e) => updateConfig({ mailPassword: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="••••••••••••"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Mail From" hint="Displayed sender name & email (e.g. Center Name <sender@example.com>)">
+                    <Input
+                      value={config.mailFrom}
+                      onChange={(e) => updateConfig({ mailFrom: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="Hub Name <info@hub.com>"
+                    />
+                  </SettingsField>
+                  <SettingsSwitch
+                    label="Secure Connection"
+                    description="Use SSL/TLS (port 465) instead of STARTTLS (port 587)."
+                    checked={config.mailSecure}
+                    onChange={(v) => updateConfig({ mailSecure: v })}
+                  />
+                </div>
+              </SettingsSection>
+
+              <SettingsSection title="Google OAuth (Gmail) Settings" description="OAuth credentials required for inbox reading/polling and inbound sync.">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <SettingsField label="Google Client ID">
+                    <Input
+                      value={config.googleClientId}
+                      onChange={(e) => updateConfig({ googleClientId: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="Enter Client ID"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Google Client Secret">
+                    <Input
+                      type="password"
+                      value={config.googleClientSecret}
+                      onChange={(e) => updateConfig({ googleClientSecret: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="Enter Client Secret"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Google Redirect URI">
+                    <Input
+                      value={config.googleRedirectUri}
+                      onChange={(e) => updateConfig({ googleRedirectUri: e.target.value })}
+                      className={fieldInputClass}
+                      placeholder="http://localhost:5002/auth/google/callback"
+                    />
+                  </SettingsField>
+                  <SettingsField label="Google Refresh Token" className="sm:col-span-2">
+                    <textarea
+                      value={config.googleRefreshToken}
+                      onChange={(e) => updateConfig({ googleRefreshToken: e.target.value })}
+                      className={fieldTextareaClass}
+                      rows={3}
+                      placeholder="Enter OAuth Refresh Token"
+                    />
+                  </SettingsField>
+                </div>
+              </SettingsSection>
+            </>
           )}
 
           {activeTab === "operations" && (

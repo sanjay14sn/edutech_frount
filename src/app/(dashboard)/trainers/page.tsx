@@ -2,10 +2,9 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { GraduationCap, Plus, Search, Mail, Phone, BookOpen, Star, Award, CheckCircle2, AlertCircle, Trash2, Calendar, FileText, Settings, User, MessageSquare } from "lucide-react"
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card"
+import { GraduationCap, Plus, Search, Mail, Phone, Star, Award, Trash2, Settings, MessageSquare } from "lucide-react"
+import { Card, CardHeader, CardContent } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
-import { Input } from "@/components/ui/Input"
 import { Badge } from "@/components/ui/Badge"
 import { Dialog } from "@/components/ui/Dialog"
 import { useStore } from "@/store/useStore"
@@ -20,7 +19,7 @@ export default function TrainersPage() {
   const { policy, atCapacity } = useCenterPolicy()
   const trainersAtCapacity = atCapacity("trainers")
   const [trainers, setTrainers] = React.useState<any[]>([])
-  const [isLoading, setIsLoading] = React.useState(true)
+  const [pageLoading, setPageLoading] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [feedbackOpen, setFeedbackOpen] = React.useState(false)
   const [feedbackLoading, setFeedbackLoading] = React.useState(false)
@@ -73,7 +72,7 @@ export default function TrainersPage() {
   React.useEffect(() => {
     const loadTrainers = async () => {
       try {
-        setIsLoading(true)
+        setPageLoading(true)
         await useStore.getState().fetchCenterPolicy()
         const [trainerData, batchData] = await Promise.all([
           api.getTrainers(),
@@ -83,7 +82,7 @@ export default function TrainersPage() {
       } catch (err) {
         console.error("Failed to load trainers:", err)
       } finally {
-        setIsLoading(false)
+        setPageLoading(false)
       }
     }
     loadTrainers()
@@ -139,6 +138,22 @@ export default function TrainersPage() {
     return <span className="px-2 py-0.5 text-[9px] font-bold rounded-md bg-amber-500/10 text-amber-400">{t}</span>
   }
 
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
+        <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <p className="text-xs text-muted-foreground">Loading trainer faculty ledger...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -184,11 +199,7 @@ export default function TrainersPage() {
       </div>
 
       {/* Trainers Grid */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="h-6 w-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
-      ) : filteredTrainers.length === 0 ? (
+      {filteredTrainers.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
           No trainers registered yet.
         </div>
@@ -196,15 +207,21 @@ export default function TrainersPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredTrainers.map((trainer) => (
             <Card key={trainer.id} className="bg-card flex flex-col justify-between group relative">
-              <CardHeader className="pb-3 pr-10">
+              <CardHeader
+                className="pb-3 pr-10 cursor-pointer rounded-t-xl transition-colors hover:bg-muted/20"
+                onClick={() => router.push(`/trainers/${trainer.id}`)}
+                title="View trainer profile"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs group-hover:ring-2 group-hover:ring-primary/20 transition-all">
                       {trainer.name.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <h3 className="font-bold text-sm text-foreground">{trainer.name}</h3>
+                        <h3 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+                          {trainer.name}
+                        </h3>
                         {getEmploymentBadge(trainer.employmentType)}
                       </div>
                       <span className="text-[10px] text-muted-foreground font-mono font-medium block">

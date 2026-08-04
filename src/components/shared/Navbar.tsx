@@ -8,12 +8,25 @@ import { useStore } from "@/store/useStore"
 import { ThemeSwitcher } from "./ThemeSwitcher"
 import { NotificationDropdown } from "./NotificationDropdown"
 import { UserDropdown } from "./UserDropdown"
+import { GlobalSearchModal } from "./GlobalSearchModal"
 import { cn } from "@/lib/utils"
 
 export function Navbar() {
   const pathname = usePathname()
   const { user } = useStore()
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  const [searchOpen, setSearchOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    function handleGlobalKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setSearchOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKey)
+    return () => window.removeEventListener("keydown", handleGlobalKey)
+  }, [])
 
   // Generate breadcrumbs dynamically
   const getBreadcrumbs = () => {
@@ -116,15 +129,23 @@ export function Navbar() {
         </div>
 
         {/* Center: Search Bar */}
-        <div className="hidden lg:flex w-full max-w-sm relative">
+        <div
+          onClick={() => setSearchOpen(true)}
+          className="hidden lg:flex w-full max-w-sm relative cursor-pointer mx-6"
+        >
           <div className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
             <Search className="h-4 w-4" />
           </div>
           <input
+            readOnly
             type="text"
             placeholder="Search leads, students, fees..."
-            className="w-full h-8 rounded-lg border border-border/80 bg-muted/30 px-3 pl-9 text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+            className="w-full h-8 rounded-lg border border-border/80 bg-muted/30 px-3 pl-9 text-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
           />
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[9px] font-bold text-muted-foreground/60 border border-border/80 rounded bg-muted/40 px-1 py-0.5 select-none">
+            <span>⌘</span>
+            <span>K</span>
+          </div>
         </div>
 
         {/* Right Side: Switchers + Profile + Notifications */}
@@ -195,6 +216,7 @@ export function Navbar() {
           </div>
         </div>
       )}
+      <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )
 }

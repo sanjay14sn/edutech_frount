@@ -1,4 +1,19 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://erpapi.erphubtechnologies.in/api"
+const DEFAULT_BACKEND_API = "http://127.0.0.1:5002/api"
+
+/** Browser uses same-origin `/api` (proxied by Next.js). SSR / uploads use full backend URL. */
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" ? "/api" : DEFAULT_BACKEND_API)
+
+export function getBackendOrigin() {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, "")
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin
+  }
+  return DEFAULT_BACKEND_API.replace(/\/api\/?$/, "")
+}
 
 const TRANSIENT_HTTP = new Set([502, 503, 504])
 
@@ -58,7 +73,7 @@ export async function uploadAPI(endpoint: string, formData: FormData) {
 }
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const maxAttempts = endpoint === "/auth/me" ? 8 : 4
+  const maxAttempts = endpoint === "/auth/me" ? 8 : 6
   let lastError: unknown
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -101,8 +116,13 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     } catch (error) {
       lastError = error
       if (isNetworkError(error) && attempt < maxAttempts - 1) {
-        await sleep(400 * (attempt + 1))
+        await sleep(600 * (attempt + 1))
         continue
+      }
+      if (isNetworkError(error)) {
+        throw new Error(
+          `Cannot reach API at ${API_URL}. Ensure the backend is running (npm run dev in edu-crm-backend).`
+        )
       }
       throw error
     }
@@ -146,6 +166,56 @@ export const api = {
   updateLeadStage: (id: string, stage: string) => fetchAPI(`/bde/leads/${id}/stage`, { method: 'PUT', body: JSON.stringify({ stage }) }),
   updateLead: (id: string, data: any) => fetchAPI(`/bde/leads/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteLead: (id: string) => fetchAPI(`/bde/leads/${id}`, { method: 'DELETE' }),
+
+  // Lead email chatbot
+  getLeadChatbotStatus: () => fetchAPI('/lead-chatbot/gmail/status'),
+  getLeadChat: (leadId: string) => fetchAPI(`/lead-chatbot/leads/${leadId}/chat`),
+  sendLeadChatReply: (leadId: string, data: { subject?: string; body: string }) =>
+    fetchAPI(`/lead-chatbot/leads/${leadId}/chat/reply`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  triggerLeadOutreach: (leadId: string) =>
+    fetchAPI(`/lead-chatbot/leads/${leadId}/chat/outreach`, { method: 'POST' }),
+  getLeadChatbotSettings: () => fetchAPI('/lead-chatbot/settings'),
+  updateLeadChatbotSettings: (data: {
+    autoReplyEnabled?: boolean
+    followUpsEnabled?: boolean
+  }) =>
+    fetchAPI('/lead-chatbot/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  scanLeadInbound: () => fetchAPI('/lead-chatbot/inbound/scan', { method: 'POST' }),
+  scanLeadReplies: () => fetchAPI('/lead-chatbot/replies/scan', { method: 'POST' }),
+
+  // Lead webhook integrations
+  getLeadIntegrations: () => fetchAPI('/lead-integrations'),
+  createLeadIntegration: (data: {
+    name: string
+    source: string
+    defaultCourse?: string
+    assignedBdeId?: string
+    counsellor?: string
+  }) => fetchAPI('/lead-integrations', { method: 'POST', body: JSON.stringify(data) }),
+  updateLeadIntegration: (
+    id: string,
+    data: {
+      name?: string
+      source?: string
+      defaultCourse?: string
+      assignedBdeId?: string
+      counsellor?: string
+      isActive?: boolean
+    }
+  ) => fetchAPI(`/lead-integrations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  rotateLeadIntegrationKey: (id: string) =>
+    fetchAPI(`/lead-integrations/${id}/rotate-key`, { method: 'POST' }),
+  revealLeadIntegrationKey: (id: string) => fetchAPI(`/lead-integrations/${id}/reveal-key`),
+  deleteLeadIntegration: (id: string, hard = false) =>
+    fetchAPI(`/lead-integrations/${id}${hard ? '?hard=true' : ''}`, { method: 'DELETE' }),
+
+
   getTasks: () => fetchAPI('/bde/tasks'),
   updateTaskStatus: (id: string, status: string) => fetchAPI(`/bde/tasks/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   punchBdeAttendance: (action: 'login' | 'pause' | 'resume' | 'logout') =>
@@ -237,6 +307,28 @@ export const api = {
     scholarshipAmount?: number
     scholarshipNotes?: string
   }) => fetchAPI(`/students/${id}/fees`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Fee reminder calls (Exotel)
+  getFeeReminderTargets: () => fetchAPI('/fees/reminders/targets'),
+  getFeeReminderCalls: () => fetchAPI('/fees/reminders/calls'),
+  callFeeReminders: (studentIds: string[]) =>
+    fetchAPI('/fees/reminders/call', {
+      method: 'POST',
+      body: JSON.stringify({ studentIds }),
+    }),
+  callAllFeeReminders: () =>
+    fetchAPI('/fees/reminders/call-all', { method: 'POST' }),
+
+  // Fee reminder emails
+  getFeeReminderEmails: () => fetchAPI('/fees/reminders/emails'),
+  sendFeeReminderEmails: (studentIds: string[]) =>
+    fetchAPI('/fees/reminders/email', {
+      method: 'POST',
+      body: JSON.stringify({ studentIds }),
+    }),
+  sendAllFeeReminderEmails: () =>
+    fetchAPI('/fees/reminders/email-all', { method: 'POST' }),
+
   updateBatchStudentRemarks: (batchId: string, studentName: string, remarks: string) =>
     fetchAPI(`/batches/${batchId}/remarks`, {
       method: 'PUT',
@@ -273,6 +365,13 @@ export const api = {
 
   // Attendance
   getAttendance: (date: string, type: string) => fetchAPI(`/attendance?date=${date}&type=${type}`),
+  getAttendanceMonth: (month: string, type: string) =>
+    fetchAPI(`/attendance?month=${month}&type=${type}`),
+  finalizeAttendanceMonth: (month: string, type: string) =>
+    fetchAPI('/attendance/finalize-month', {
+      method: 'POST',
+      body: JSON.stringify({ month, type }),
+    }),
   getAttendanceByEntity: (entityId: string, type: string = 'student') => fetchAPI(`/attendance?entityId=${entityId}&type=${type}`),
   getMyAttendance: () => fetchAPI('/attendance'),
   getMyBdeShiftLogs: () => fetchAPI('/attendance'),
@@ -281,8 +380,45 @@ export const api = {
     body: JSON.stringify({ date, type, records })
   }),
 
-  // HR & Payroll
+  // HR & Payroll Suite
   getHROverview: (month?: string) => fetchAPI(`/hr/overview${month ? `?month=${month}` : ''}`),
+  getHRDashboard: (month?: string) => fetchAPI(`/hr/dashboard${month ? `?month=${month}` : ''}`),
+  getHRMe: () => fetchAPI('/hr/me'),
+  getHREmployees: () => fetchAPI('/hr/employees'),
+  updateHREmployee: (id: string, data: any) =>
+    fetchAPI(`/hr/employees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  exitHREmployee: (id: string, data: { exitDate?: string; exitReason?: string }) =>
+    fetchAPI(`/hr/employees/${id}/exit`, { method: 'PUT', body: JSON.stringify(data) }),
+  getHRHolidays: (year?: string) =>
+    fetchAPI(`/hr/holidays${year ? `?year=${year}` : ''}`),
+  createHRHoliday: (data: any) =>
+    fetchAPI('/hr/holidays', { method: 'POST', body: JSON.stringify(data) }),
+  deleteHRHoliday: (id: string) => fetchAPI(`/hr/holidays/${id}`, { method: 'DELETE' }),
+  getHRLeavePolicy: () => fetchAPI('/hr/leave/policy'),
+  updateHRLeavePolicy: (data: any) =>
+    fetchAPI('/hr/leave/policy', { method: 'PUT', body: JSON.stringify(data) }),
+  getHRLeaveBalances: (year?: number) =>
+    fetchAPI(`/hr/leave/balances${year ? `?year=${year}` : ''}`),
+  getHRLeaveRequests: (params?: { status?: string; employeeId?: string }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.set('status', params.status)
+    if (params?.employeeId) q.set('employeeId', params.employeeId)
+    const qs = q.toString()
+    return fetchAPI(`/hr/leave/requests${qs ? `?${qs}` : ''}`)
+  },
+  createHRLeaveRequest: (data: any) =>
+    fetchAPI('/hr/leave/requests', { method: 'POST', body: JSON.stringify(data) }),
+  reviewHRLeaveRequest: (id: string, status: 'Approved' | 'Rejected') =>
+    fetchAPI(`/hr/leave/requests/${id}/review`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  getHRSalaryStructures: () => fetchAPI('/hr/salary-structures'),
+  upsertHRSalaryStructure: (data: any) =>
+    fetchAPI('/hr/salary-structures', { method: 'PUT', body: JSON.stringify(data) }),
+  getHRClaims: (employeeId?: string) =>
+    fetchAPI(`/hr/claims${employeeId ? `?employeeId=${employeeId}` : ''}`),
+  getHRDocuments: (employeeId?: string) =>
+    fetchAPI(`/hr/documents${employeeId ? `?employeeId=${employeeId}` : ''}`),
+  getHRReports: (month?: string) =>
+    fetchAPI(`/hr/reports${month ? `?month=${month}` : ''}`),
   submitHRPayroll: (data: any) => fetchAPI('/hr/payroll', { method: 'POST', body: JSON.stringify(data) }),
   updateHRPayrollStatus: (id: string, data: any) => fetchAPI(`/hr/payroll/${id}/status`, { method: 'PUT', body: JSON.stringify(data) }),
   upsertHRCommissionRule: (data: any) => fetchAPI('/hr/commission-rules', { method: 'PUT', body: JSON.stringify(data) }),

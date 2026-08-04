@@ -24,7 +24,7 @@ import {
   Award,
   ShieldCheck,
   HardDrive,
-  UserCircle
+  UserCircle,
 } from "lucide-react"
 import { useStore } from "@/store/useStore"
 import { cn } from "@/lib/utils"
@@ -44,7 +44,6 @@ export function Sidebar() {
     badgeCount?: number
   }
 
-  // Dynamic navigation links based on user role
   const getNavLinks = (): NavLink[] => {
     const role = user?.role || "owner"
 
@@ -64,19 +63,19 @@ export function Sidebar() {
     }
 
     if (role === "trainer") {
-      const trainerLinks = [
+      return [
         { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
         { label: "Students", path: "/students", icon: Users },
         { label: "Attendance", path: "/attendance", icon: CalendarCheck },
         { label: "My Batches", path: "/courses", icon: BookOpen },
         { label: "LMS", path: "/lms", icon: MonitorPlay },
         ...(policyOk("enableJobPortal") ? [{ label: "Job Portal", path: "/jobs", icon: Briefcase }] : []),
+        ...(policyOk("enableHrModule") ? [{ label: "Staff Payroll & HR", path: "/hr/me", icon: Wallet }] : []),
       ]
-      return trainerLinks
     }
 
     if (role === "student") {
-      const studentLinks = [
+      return [
         { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
         { label: "My Courses", path: "/courses", icon: BookOpen },
         { label: "LMS", path: "/lms", icon: MonitorPlay },
@@ -85,7 +84,6 @@ export function Sidebar() {
         { label: "Certification", path: "/certification", icon: Award },
         ...(policyOk("enableJobPortal") ? [{ label: "Job Portal", path: "/jobs", icon: Briefcase }] : []),
       ]
-      return studentLinks
     }
 
     if (role === "bde") {
@@ -97,12 +95,12 @@ export function Sidebar() {
         { label: "Tasks Log", path: "/tasks", icon: BookOpen },
         { label: "My Attendance", path: "/attendance", icon: CalendarCheck },
         { label: "Performance", path: "/performance", icon: BarChart3 },
+        ...(policyOk("enableHrModule") ? [{ label: "Staff Payroll & HR", path: "/hr/me", icon: Wallet }] : []),
         { label: "Support Desk", path: "/support", icon: MessageSquare },
         { label: "Reports", path: "/reports", icon: BarChart3 },
       ]
     }
 
-    // Owner role: core links always present, show all modules for now
     const moduleLinks = [
       { label: "Leads CRM", path: "/crm", icon: GitPullRequest },
       { label: "BDE Management", path: "/bde", icon: Users },
@@ -122,7 +120,6 @@ export function Sidebar() {
       { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
       ...moduleLinks,
       { label: "Profile", path: "/profile", icon: UserCircle },
-      // Support/Query replaces Settings for owner
       { label: "Support", path: "/support", icon: MessageSquare },
     ]
   }
@@ -136,7 +133,6 @@ export function Sidebar() {
         sidebarCollapsed ? "w-16" : "w-64"
       )}
     >
-      {/* Brand logo header */}
       <div className="flex h-14 items-center justify-between px-4 border-b border-border/50">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -163,11 +159,12 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Navigation menu list */}
       <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
         {links.map((link) => {
           const Icon = link.icon
-          const isActive = pathname === link.path || (link.path !== "/dashboard" && pathname.startsWith(link.path))
+          const isActive =
+            pathname === link.path ||
+            (link.path !== "/dashboard" && pathname.startsWith(link.path))
 
           return (
             <Link
@@ -180,7 +177,12 @@ export function Sidebar() {
                   : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               )}
             >
-              <Icon className={cn("h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105", isActive ? "text-primary-foreground" : "text-muted-foreground")} />
+              <Icon
+                className={cn(
+                  "h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105",
+                  isActive ? "text-primary-foreground" : "text-muted-foreground"
+                )}
+              />
               {!sidebarCollapsed && (
                 <motion.span
                   initial={{ opacity: 0 }}
@@ -221,7 +223,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer collapsing controls */}
       <div className="p-3 border-t border-border/50">
         {sidebarCollapsed && (
           <button

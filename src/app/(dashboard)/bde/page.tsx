@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Users, UserPlus, ShieldAlert, Key, Award, BarChart3, CalendarCheck, CheckCircle2, AlertCircle, 
@@ -16,6 +17,7 @@ import { useStore, BDE, Lead, BDETask } from "@/store/useStore"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { formatDuration, shiftStatusLabel, type ShiftStatus } from "@/lib/shiftTimer"
 import { api, ApiError } from "@/lib/api"
+import { leadBelongsToBde, leadIsUnassigned, normalizeLeadRecord } from "@/lib/bdeLeads"
 import { useCenterPolicy } from "@/hooks/useCenterPolicy"
 import { CapacityLimitNotice, showCapacityLimitToast } from "@/components/shared/CapacityLimitNotice"
 
@@ -735,24 +737,8 @@ function BdeAttendanceCalendar({
   )
 }
 
-function leadBelongsToBde(lead: Lead, bde: BDE) {
-  if (lead.assignedBdeId && String(lead.assignedBdeId) === String(bde.id)) {
-    return true
-  }
-  const counsellor = (lead.counsellor || "").trim().toLowerCase()
-  const bdeName = (bde.name || "").trim().toLowerCase()
-  return counsellor.length > 0 && counsellor === bdeName
-}
-
-function leadIsUnassigned(lead: Lead, bdes: BDE[]) {
-  return !bdes.some((bde) => leadBelongsToBde(lead, bde))
-}
-
-function normalizeLeadRecord(lead: Lead & { _id?: string }) {
-  return { ...lead, id: lead.id || lead._id || "" } as Lead
-}
-
 export default function BDEManagementPage() {
+  const router = useRouter()
   const { 
     bdes, 
     leads, 
@@ -769,9 +755,11 @@ export default function BDEManagementPage() {
   } = useStore()
   const { policy, atCapacity } = useCenterPolicy()
   const bdeAtCapacity = atCapacity("bdes")
+  const [pageLoading, setPageLoading] = React.useState(true)
   
   React.useEffect(() => {
     const fetchData = async () => {
+      setPageLoading(true)
       try {
         await useStore.getState().fetchCenterPolicy()
         const [bdesData, leadsData] = await Promise.all([
@@ -779,11 +767,11 @@ export default function BDEManagementPage() {
           api.getLeads().catch(() => []),
         ])
         setBdes(bdesData)
-        if (leadsData.length > 0) {
-          setLeads(leadsData.map((lead: Lead & { _id?: string }) => normalizeLeadRecord(lead)))
-        }
+        setLeads((leadsData || []).map((lead: Lead & { _id?: string }) => normalizeLeadRecord(lead)))
       } catch (error) {
         console.error("Failed to fetch BDE directory data:", error)
+      } finally {
+        setPageLoading(false)
       }
     }
     fetchData()
@@ -817,6 +805,10 @@ export default function BDEManagementPage() {
   const [shiftLogs, setShiftLogs] = React.useState<BdeShiftLog[]>([])
   const [attendanceLoading, setAttendanceLoading] = React.useState(false)
   const [attendanceBdeFilter, setAttendanceBdeFilter] = React.useState("")
+
+  const openBdeLeads = React.useCallback((bde: BDE) => {
+    router.push(`/bde/${bde.id}/leads`)
+  }, [router])
 
   const attendanceBdesSorted = React.useMemo(
     () => [...bdes].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
@@ -1309,6 +1301,22 @@ export default function BDEManagementPage() {
     </div>
   )
 
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
+        <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+        <p className="text-xs text-muted-foreground">Loading BDE directory and lead assignments...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Title & Add/Actions Header */}
@@ -1437,13 +1445,19 @@ export default function BDEManagementPage() {
                         
                         return (
                           <tr key={bde.id} className="hover:bg-muted/40 transition-colors">
-                            <td className="p-4">
+                            <td
+                              className="p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                              onClick={() => openBdeLeads(bde)}
+                              title="View assigned leads"
+                            >
                               <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-primary shrink-0">
                                   {bde.name.substring(0,2).toUpperCase()}
                                 </div>
                                 <div>
-                                  <p className="font-bold text-foreground leading-tight">{bde.name}</p>
+                                  <p className="font-bold text-foreground leading-tight hover:text-primary transition-colors">
+                                    {bde.name}
+                                  </p>
                                   <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground font-mono">
                                     <span>{bde.employeeId}</span>
                                     <span>•</span>
@@ -1457,7 +1471,13 @@ export default function BDEManagementPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="p-4 text-center font-semibold text-foreground">{myLeads.length}</td>
+                            <td
+                              className="p-4 text-center font-semibold text-foreground cursor-pointer hover:text-primary hover:bg-muted/20 transition-colors"
+                              onClick={() => openBdeLeads(bde)}
+                              title="View assigned leads"
+                            >
+                              {myLeads.length}
+                            </td>
                             <td className="p-4 text-center">
                               <p className="font-bold text-foreground">{rate}%</p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">{myConverted}</p>
@@ -1512,6 +1532,18 @@ export default function BDEManagementPage() {
                                     <div className={`absolute right-0 w-48 rounded-lg border border-border bg-card p-1 shadow-md z-50 text-left ${
                                       isLast ? "bottom-full mb-1" : "mt-8"
                                     }`}>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setOpenDropdownId(null)
+                                          openBdeLeads(bde)
+                                        }}
+                                        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-foreground hover:bg-secondary rounded-md cursor-pointer text-left font-medium"
+                                      >
+                                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>View Assigned Leads</span>
+                                      </button>
                                       <button
                                         type="button"
                                         onClick={(e) => {
