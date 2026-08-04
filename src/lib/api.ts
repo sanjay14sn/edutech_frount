@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_API = "http://127.0.0.1:5002/api"
+const DEFAULT_BACKEND_API = "https://erpapi.erphubtechnologies.in/api"
 
 /** Browser uses same-origin `/api` (proxied by Next.js). SSR / uploads use full backend URL. */
 export const API_URL =

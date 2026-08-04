@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5002";
+const backendUrl = process.env.BACKEND_URL || "https://erpapi.erphubtechnologies.in";
 
 const nextConfig: NextConfig = {
   async rewrites() {
