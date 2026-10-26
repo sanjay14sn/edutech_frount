@@ -10,6 +10,7 @@ import { NotificationDropdown } from "./NotificationDropdown"
 import { UserDropdown } from "./UserDropdown"
 import { GlobalSearchModal } from "./GlobalSearchModal"
 import { cn } from "@/lib/utils"
+import { EMPLOYEE_NAV_ITEMS } from "@/lib/employeePortal"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -61,6 +62,9 @@ export function Navbar() {
         { label: "My Batches", path: "/courses", icon: BookOpen },
         { label: "Settings", path: "/settings", icon: Settings },
       ]
+    }
+    if (role === "employee") {
+      return EMPLOYEE_NAV_ITEMS
     }
     if (role === "student") {
       return [

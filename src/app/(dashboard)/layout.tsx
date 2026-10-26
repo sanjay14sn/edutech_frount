@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useStore } from "@/store/useStore"
 import { api } from "@/lib/api"
 import { Sidebar } from "@/components/shared/Sidebar"
@@ -12,6 +12,7 @@ import {
   clearAuthSession,
   verifyStudentPortalAccess,
 } from "@/lib/studentAccess"
+import { isEmployeePortalPath } from "@/lib/employeePortal"
 
 export default function DashboardLayout({
   children,
@@ -19,8 +20,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { isAuthenticated, user, theme, logout, login, fetchNotifications, fetchCenterPolicy, fetchSupportQueueCount } = useStore()
   const [verified, setVerified] = React.useState(false)
+
+  const employeeOffPortal = user?.role === "employee" && !isEmployeePortalPath(pathname)
+  React.useEffect(() => {
+    if (verified && employeeOffPortal) router.replace("/dashboard")
+  }, [verified, employeeOffPortal, router])
 
   // Apply theme
   React.useEffect(() => {
@@ -100,7 +107,7 @@ export default function DashboardLayout({
     return <PageLoader variant="fullscreen" />
   }
 
-  if (!isAuthenticated || !user) {
+  if (!isAuthenticated || !user || employeeOffPortal) {
     return <PageLoader variant="fullscreen" />
   }
 

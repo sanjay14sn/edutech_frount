@@ -36,6 +36,7 @@ export default function LoginPage() {
   const isAccessDeniedError =
     errorMsg.includes("on hold") ||
     errorMsg.includes("does not have portal access") ||
+
     errorMsg.includes("enrollment is completed")
 
   React.useEffect(() => {
@@ -102,7 +103,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 flex items-center justify-center">
         {/* Ambient Soft Glow Behind Animation */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[750px] bg-gradient-to-tr from-cyan-200/50 via-sky-300/40 to-blue-200/30 rounded-full blur-3xl opacity-80" />
-        
+
         {/* Lottie Animation Layer - Sized to extend beyond the 420px card */}
         <div className="w-[600px] h-[600px] sm:w-[750px] sm:h-[750px] flex items-center justify-center opacity-90">
           <Lottie

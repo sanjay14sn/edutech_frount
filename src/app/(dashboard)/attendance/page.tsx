@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import {
   CalendarCheck, QrCode, Users, Check, X, Clock, Award, Bell,
-  Calendar, Activity, UserCheck, AlertCircle, ShieldAlert, GraduationCap, Briefcase, Search, History
+  Calendar, Activity, UserCheck, AlertCircle, ShieldAlert, GraduationCap, Briefcase, Search, History, UserCog
 } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -136,7 +136,8 @@ export default function AttendancePage() {
   const userName = user?.name
 
   // Staff/Owner Terminal States
-  const [category, setCategory] = React.useState<"student" | "trainer" | "bde">("student")
+  const [category, setCategory] = React.useState<"student" | "trainer" | "bde" | "employee">("student")
+  const categoryLabel = category === "employee" ? "Other Staff" : category === "bde" ? "BDE" : category
   const dateFromUrl = searchParams.get("date")
   const [date, setDate] = React.useState(() => dateFromUrl || new Date().toISOString().split("T")[0])
   const [records, setRecords] = React.useState<AttendanceRecord[]>([])
@@ -410,6 +411,25 @@ export default function AttendancePage() {
             if (requestId !== loadRequestRef.current) return
             setRecords(mergeBdeAttendanceRecords(bdes, existing))
           }
+        } else if (category === "employee") {
+          const employees: any[] = await api.getHREmployees().catch(() => [])
+          if (requestId !== loadRequestRef.current) return
+          const byId = new Map(existing.map((r: any) => [String(r.entityId), r]))
+          setRecords(
+            employees
+              .filter(
+                (e) =>
+                  e.sourceType === "manual" &&
+                  e.status === "active" &&
+                  (!e.joiningDate || String(e.joiningDate).slice(0, 10) <= date)
+              )
+              .map((e) => {
+                const att = byId.get(String(e.sourceId))
+                return att
+                  ? mapAttendance(att)
+                  : { entityId: String(e.sourceId), name: e.name, status: "present" as const }
+              })
+          )
         } else if (existing.length > 0) {
           setRecords(existing.map(mapAttendance))
         } else {
@@ -541,7 +561,7 @@ export default function AttendancePage() {
       await api.saveAttendance(date, category, payload)
       addNotification({
         title: "Attendance Recorded",
-        description: `Daily ledger submitted for ${category}s on ${date}.`,
+        description: `Daily ledger submitted for ${category === "employee" ? "other staff" : `${category}s`} on ${date}.`,
         type: "attendance"
       })
       if (category === "bde") {
@@ -551,7 +571,7 @@ export default function AttendancePage() {
         ])
         setRecords(mergeBdeAttendanceRecords(bdes, existing))
       }
-      alert(`Success: Attendance report submitted for ${category}s!`)
+      alert(`Success: Attendance report submitted for ${category === "employee" ? "other staff" : `${category}s`}!`)
     } catch (err: any) {
       console.error(err)
       alert(err.message || "Failed to submit attendance")
@@ -1074,6 +1094,15 @@ export default function AttendancePage() {
           <Briefcase className="h-4 w-4" />
           <span>BDE Staff Attendance</span>
         </button>
+        <button
+          onClick={() => setCategory("employee")}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+            category === "employee" ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <UserCog className="h-4 w-4" />
+          <span>Other Staff Attendance</span>
+        </button>
         </>
         )}
       </div>
@@ -1083,12 +1112,14 @@ export default function AttendancePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <CalendarCheck className="h-5 w-5 text-primary" />
-            <span>{`${category} Operations Terminal`}</span>
+            <span className="capitalize">{`${categoryLabel} Operations Terminal`}</span>
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {category === "bde"
               ? "Audit BDE shift punches and manually mark attendance when BDEs did not punch in from their dashboard."
-              : `Log daily check-ins, audit terminal logs, or configure hardware readers for ${category}s.`}
+              : category === "employee"
+                ? "Mark daily attendance for staff added under Staff Payroll & HR → Employees (non-trainer, non-BDE)."
+                : `Log daily check-ins, audit terminal logs, or configure hardware readers for ${category}s.`}
           </p>
         </div>
         
@@ -1228,7 +1259,7 @@ export default function AttendancePage() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <CardTitle className="text-base font-extrabold capitalize">
-                        {category === "bde" ? "BDE Shift Log" : `${category} Roll Call Sheet`}
+                        {category === "bde" ? "BDE Shift Log" : `${categoryLabel} Roll Call Sheet`}
                       </CardTitle>
                       <CardDescription>
                         {category === "bde"
@@ -1359,7 +1390,7 @@ export default function AttendancePage() {
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                     <input
                       type="text"
-                      placeholder={`Search ${category} by name...`}
+                      placeholder={`Search ${category === "employee" ? "staff" : category} by name...`}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full bg-card text-xs border border-border h-8.5 rounded-lg pl-8 pr-3 text-foreground focus-visible:outline-hidden"
@@ -1410,7 +1441,18 @@ export default function AttendancePage() {
                     </div>
                   ) : filteredRecords.length === 0 ? (
                     <div className="text-center py-12 text-xs text-muted-foreground">
-                      {searchTerm ? "No matching records found." : `No ${category} records found in database.`}
+                      {searchTerm ? (
+                        "No matching records found."
+                      ) : category === "employee" ? (
+                        <>
+                          No other staff yet.{" "}
+                          <Link href="/hr/employees" className="font-semibold text-primary hover:underline">
+                            Add employees in Staff Payroll &amp; HR
+                          </Link>
+                        </>
+                      ) : (
+                        `No ${category} records found in database.`
+                      )}
                     </div>
                   ) : (
                     <div className="grid gap-3 p-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">

@@ -70,12 +70,6 @@ const moduleMeta: Record<string, { blurb: string; iconWrap: string; tile: string
     tile: "hover:border-slate-500/40 hover:shadow-slate-500/5",
     accent: "from-slate-500/10",
   },
-  "/hr/holidays": {
-    blurb: "Public & company holidays",
-    iconWrap: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-    tile: "hover:border-rose-500/40 hover:shadow-rose-500/5",
-    accent: "from-rose-500/10",
-  },
   "/hr/settings": {
     blurb: "Leave policy & defaults",
     iconWrap: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-300",

@@ -1,6 +1,7 @@
 "use client"
 import * as React from "react"
-import { Briefcase, Plus, Calendar, Clock, MapPin, IndianRupee, Search, ClipboardList, CheckCircle2, UserCheck, XCircle, ArrowUpRight, ArrowLeft, Send, Mail, UploadCloud, Loader2, Sparkles, Cpu, Check, Video, Link2, Phone, CalendarCheck, AlertCircle, Trash2 } from "lucide-react"
+import Link from "next/link"
+import { Briefcase, Plus, Calendar, Clock, MapPin, IndianRupee, Search, ClipboardList, CheckCircle2, UserCheck, XCircle, ArrowUpRight, ArrowLeft, Send, Mail, UploadCloud, Loader2, Sparkles, Cpu, Check, Video, Link2, Phone, CalendarCheck, AlertCircle, Trash2, Target, ArrowRight } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
@@ -983,6 +984,63 @@ export default function JobPortalPage() {
                 <span className="text-[10px] text-emerald-400 mt-1 block">Hiring callbacks</span>
               </CardContent>
             </Card>
+          </div>
+
+          {/* AI Career & Placement Suite Quick Access */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Link
+              href="/jobs/resume-matcher"
+              className="group block p-4 rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/10 via-card to-card hover:border-indigo-500 transition-all shadow-xs hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-9 w-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Sparkles className="h-4.5 w-4.5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <h3 className="font-bold text-sm text-foreground mt-3 group-hover:text-indigo-500 transition-colors">
+                Resume Job Matcher
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                Extract skills from your resume & discover matching live Google job listings with company ratings.
+              </p>
+            </Link>
+
+            <Link
+              href="/jobs/ats-checker"
+              className="group block p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card to-card hover:border-emerald-500 transition-all shadow-xs hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Target className="h-4.5 w-4.5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <h3 className="font-bold text-sm text-foreground mt-3 group-hover:text-emerald-500 transition-colors">
+                ATS Score Checker
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                Test your resume against recruiter keyword algorithms, STAR bullet metrics, and formatting checks.
+              </p>
+            </Link>
+
+            <Link
+              href="/jobs/interview-prep"
+              className="group block p-4 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-card to-card hover:border-violet-500 transition-all shadow-xs hover:shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="h-9 w-9 rounded-xl bg-violet-500/10 text-violet-500 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Video className="h-4.5 w-4.5" />
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all" />
+              </div>
+              <h3 className="font-bold text-sm text-foreground mt-3 group-hover:text-violet-500 transition-colors">
+                Live AI Interview Prep
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                Practice real-time voice and video mock interview rounds with Gemini Live AI and score evaluations.
+              </p>
+            </Link>
           </div>
 
           <Tabs defaultValue="jobs">

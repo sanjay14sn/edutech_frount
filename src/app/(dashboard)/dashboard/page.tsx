@@ -7,6 +7,7 @@ import { OwnerDashboard } from "@/components/dashboard/OwnerDashboard"
 import { TrainerDashboard } from "@/components/dashboard/TrainerDashboard"
 import { StudentDashboard } from "@/components/dashboard/StudentDashboard"
 import { BDEDashboard } from "@/components/dashboard/BDEDashboard"
+import { EmployeeDashboard } from "@/components/dashboard/EmployeeDashboard"
 
 export default function DashboardPage() {
   const { user } = useStore()
@@ -33,6 +34,8 @@ export default function DashboardPage() {
       return <StudentDashboard />
     case "bde":
       return <BDEDashboard />
+    case "employee":
+      return <EmployeeDashboard />
     default:
       return <OwnerDashboard />
   }

@@ -1,7 +1,7 @@
 "use client"
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import {
   LayoutDashboard,
@@ -25,14 +25,35 @@ import {
   ShieldCheck,
   HardDrive,
   UserCircle,
+  LogOut,
+  Target,
+  Video,
 } from "lucide-react"
 import { useStore } from "@/store/useStore"
+import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { isPolicyFeatureEnabled } from "@/lib/centerPolicyClient"
+import { EMPLOYEE_NAV_ITEMS, initials } from "@/lib/employeePortal"
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { sidebarCollapsed, toggleSidebar, user, centerPolicy, supportQueueCount } = useStore()
+  const router = useRouter()
+  const { sidebarCollapsed, toggleSidebar, user, centerPolicy, supportQueueCount, logout } = useStore()
+  const isEmployee = user?.role === "employee"
+  const [employeeCode, setEmployeeCode] = React.useState("")
+
+  React.useEffect(() => {
+    if (!isEmployee) return
+    api
+      .getEmployeeSummary()
+      .then((data) => setEmployeeCode(data?.employee?.employeeCode || ""))
+      .catch(() => setEmployeeCode(""))
+  }, [isEmployee])
+
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+  }
 
   const policyOk = (feature: Parameters<typeof isPolicyFeatureEnabled>[1]) =>
     user?.role === "super_admin" || isPolicyFeatureEnabled(centerPolicy, feature)
@@ -82,8 +103,19 @@ export function Sidebar() {
         { label: "Attendance", path: "/attendance", icon: CalendarCheck },
         { label: "My Fees", path: "/fees", icon: CreditCard },
         { label: "Certification", path: "/certification", icon: Award },
-        ...(policyOk("enableJobPortal") ? [{ label: "Job Portal", path: "/jobs", icon: Briefcase }] : []),
+        ...(policyOk("enableJobPortal")
+          ? [
+              { label: "Job Portal", path: "/jobs", icon: Briefcase },
+              { label: "Resume Matcher", path: "/jobs/resume-matcher", icon: Sparkles },
+              { label: "ATS Checker", path: "/jobs/ats-checker", icon: Target },
+              { label: "Interview Prep", path: "/jobs/interview-prep", icon: Video },
+            ]
+          : []),
       ]
+    }
+
+    if (role === "employee") {
+      return EMPLOYEE_NAV_ITEMS
     }
 
     if (role === "bde") {
@@ -159,12 +191,31 @@ export function Sidebar() {
         )}
       </div>
 
+      {isEmployee && user && (
+        <div
+          className={cn(
+            "flex items-center gap-3 border-b border-border/50 px-4 py-4",
+            sidebarCollapsed && "justify-center px-2"
+          )}
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-1 ring-primary/20">
+            {initials(user.name) || "?"}
+          </div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
+              <p className="truncate font-mono text-[11px] text-muted-foreground">{employeeCode || "—"}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto">
         {links.map((link) => {
           const Icon = link.icon
           const isActive =
             pathname === link.path ||
-            (link.path !== "/dashboard" && pathname.startsWith(link.path))
+            (link.path !== "/dashboard" && link.path !== "/jobs" && pathname.startsWith(link.path))
 
           return (
             <Link
@@ -232,7 +283,20 @@ export function Sidebar() {
             <ChevronRight className="h-4.5 w-4.5" />
           </button>
         )}
-        {!sidebarCollapsed && (
+        {isEmployee && (
+          <button
+            onClick={handleLogout}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer",
+              sidebarCollapsed ? "justify-center mt-2" : ""
+            )}
+            title="Logout"
+          >
+            <LogOut className="h-4.5 w-4.5 shrink-0" />
+            {!sidebarCollapsed && <span>Logout</span>}
+          </button>
+        )}
+        {!sidebarCollapsed && !isEmployee && (
           <div className="rounded-lg bg-muted/65 p-3 text-xs">
             <p className="font-semibold text-foreground flex items-center gap-1.5">
               <span>Enterprise CRM</span>

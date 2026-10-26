@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, RefreshCw, LogOut, Save, Pencil, Users, ArrowLeft } from "lucide-react"
+import { Search, RefreshCw, LogOut, Save, Pencil, Users, ArrowLeft, Plus, KeyRound } from "lucide-react"
 import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -30,6 +30,7 @@ type HREmployee = {
   sourceType: string
   exitDate?: string
   exitReason?: string
+  portalAccess?: boolean
 }
 
 function initials(name: string) {
@@ -66,6 +67,8 @@ export default function HREmployeesPage() {
   const [q, setQ] = React.useState("")
   const [selected, setSelected] = React.useState<HREmployee | null>(null)
   const [editOpen, setEditOpen] = React.useState(false)
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [savingAdd, setSavingAdd] = React.useState(false)
   const [exitOpen, setExitOpen] = React.useState(false)
   const [form, setForm] = React.useState({
     department: "",
@@ -77,6 +80,23 @@ export default function HREmployeesPage() {
     phone: "",
   })
   const [exitReason, setExitReason] = React.useState("")
+  const [portalOpen, setPortalOpen] = React.useState(false)
+  const [savingPortal, setSavingPortal] = React.useState(false)
+  const [portalForm, setPortalForm] = React.useState({ email: "", password: "" })
+  const emptyAddForm = {
+    name: "",
+    email: "",
+    phone: "",
+    department: "General",
+    designation: "Staff",
+    branch: "Main Campus",
+    employmentType: "Full-Time",
+    joiningDate: new Date().toISOString().slice(0, 10),
+    reportingManager: "Center Admin",
+    baseSalary: "",
+    portalPassword: "",
+  }
+  const [addForm, setAddForm] = React.useState(emptyAddForm)
 
   const load = React.useCallback(async () => {
     try {
@@ -132,6 +152,56 @@ export default function HREmployeesPage() {
     await load()
   }
 
+  const openAdd = () => {
+    setAddForm(emptyAddForm)
+    setAddOpen(true)
+  }
+
+  const saveAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addForm.name.trim()) return
+    try {
+      setSavingAdd(true)
+      await api.createHREmployee({
+        ...addForm,
+        baseSalary: Number(addForm.baseSalary) || 0,
+      })
+      addNotification({ title: "Employee added", description: addForm.name.trim(), type: "system" })
+      setAddOpen(false)
+      await load()
+    } catch (err: any) {
+      alert(err.message || "Failed to add employee")
+    } finally {
+      setSavingAdd(false)
+    }
+  }
+
+  const openPortal = (emp: HREmployee) => {
+    setSelected(emp)
+    setPortalForm({ email: emp.email || "", password: "" })
+    setPortalOpen(true)
+  }
+
+  const savePortal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selected) return
+    try {
+      setSavingPortal(true)
+      await api.setHREmployeePortalAccess(selected.id, portalForm)
+      addNotification({
+        title: selected.portalAccess ? "Portal password reset" : "Portal access enabled",
+        description: selected.name,
+        type: "system",
+      })
+      setPortalOpen(false)
+      await load()
+    } catch (err: any) {
+      alert(err.message || "Failed to update portal access")
+    } finally {
+      setSavingPortal(false)
+    }
+  }
+
   const confirmExit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selected) return
@@ -171,6 +241,9 @@ export default function HREmployeesPage() {
           </div>
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={load}>
             Sync
+          </Button>
+          <Button size="sm" icon={Plus} onClick={openAdd}>
+            Add employee
           </Button>
         </div>
       </div>
@@ -243,6 +316,11 @@ export default function HREmployeesPage() {
                       <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0 capitalize">
                         {emp.sourceType}
                       </Badge>
+                      {emp.portalAccess && (
+                        <Badge variant="info" className="text-[10px] font-medium px-2 py-0">
+                          Portal
+                        </Badge>
+                      )}
                       <span className="text-[10px] text-muted-foreground">{emp.employmentType}</span>
                     </div>
                   </div>
@@ -286,6 +364,17 @@ export default function HREmployeesPage() {
                     >
                       Edit
                     </Button>
+                    {emp.sourceType === "manual" && emp.status === "active" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                        icon={KeyRound}
+                        onClick={() => openPortal(emp)}
+                      >
+                        {emp.portalAccess ? "Reset login" : "Portal login"}
+                      </Button>
+                    )}
                     {emp.status === "active" && (
                       <Button
                         variant="outline"
@@ -308,6 +397,125 @@ export default function HREmployeesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add employee" description="Create a staff record that is not synced from Trainers or BDEs.">
+        <form onSubmit={saveAdd} className="space-y-3 text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1 col-span-2">
+              <label className="font-semibold text-muted-foreground">Name</label>
+              <Input
+                required
+                value={addForm.name}
+                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                className="h-8 text-xs"
+                placeholder="Full name"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Email</label>
+              <Input
+                type="email"
+                value={addForm.email}
+                onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Phone</label>
+              <Input
+                value={addForm.phone}
+                onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Department</label>
+              <Input
+                value={addForm.department}
+                onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Designation</label>
+              <Input
+                value={addForm.designation}
+                onChange={(e) => setAddForm({ ...addForm, designation: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Branch</label>
+              <Input
+                value={addForm.branch}
+                onChange={(e) => setAddForm({ ...addForm, branch: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Employment type</label>
+              <Select
+                value={addForm.employmentType}
+                onChange={(e) => setAddForm({ ...addForm, employmentType: e.target.value })}
+                className="h-8 text-xs"
+              >
+                <option>Full-Time</option>
+                <option>Part-Time</option>
+                <option>Contract</option>
+                <option>Intern</option>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Joining date</label>
+              <Input
+                type="date"
+                required
+                value={addForm.joiningDate}
+                onChange={(e) => setAddForm({ ...addForm, joiningDate: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-semibold text-muted-foreground">Base salary</label>
+              <Input
+                type="number"
+                min={0}
+                value={addForm.baseSalary}
+                onChange={(e) => setAddForm({ ...addForm, baseSalary: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <label className="font-semibold text-muted-foreground">Reporting manager</label>
+              <Input
+                value={addForm.reportingManager}
+                onChange={(e) => setAddForm({ ...addForm, reportingManager: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="space-y-1 col-span-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+              <label className="font-semibold text-muted-foreground">Employee portal password (optional)</label>
+              <Input
+                type="password"
+                minLength={4}
+                autoComplete="new-password"
+                value={addForm.portalPassword}
+                onChange={(e) => setAddForm({ ...addForm, portalPassword: e.target.value })}
+                className="h-8 text-xs"
+                placeholder="Set to let this employee sign in with their email"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" icon={Save} disabled={savingAdd}>
+              {savingAdd ? "Saving…" : "Add employee"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
 
       <Dialog isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit employee profile" description={selected?.name}>
         <form onSubmit={saveEdit} className="space-y-3 text-xs">
@@ -345,6 +553,48 @@ export default function HREmployeesPage() {
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button type="submit" size="sm" icon={Save}>Save</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog
+        isOpen={portalOpen}
+        onClose={() => setPortalOpen(false)}
+        title={selected?.portalAccess ? "Reset portal login" : "Enable portal login"}
+        description={`${selected?.name ?? ""} will sign in to the employee portal with this email and password.`}
+      >
+        <form onSubmit={savePortal} className="space-y-3 text-xs">
+          <div className="space-y-1">
+            <label className="font-semibold text-muted-foreground">Login email</label>
+            <Input
+              type="email"
+              required
+              value={portalForm.email}
+              onChange={(e) => setPortalForm({ ...portalForm, email: e.target.value })}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="font-semibold text-muted-foreground">
+              {selected?.portalAccess ? "New password" : "Password"}
+            </label>
+            <Input
+              type="password"
+              required
+              minLength={4}
+              autoComplete="new-password"
+              value={portalForm.password}
+              onChange={(e) => setPortalForm({ ...portalForm, password: e.target.value })}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setPortalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" icon={KeyRound} disabled={savingPortal}>
+              {savingPortal ? "Saving…" : "Save login"}
+            </Button>
           </div>
         </form>
       </Dialog>

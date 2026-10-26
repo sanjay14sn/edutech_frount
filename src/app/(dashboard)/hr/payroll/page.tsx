@@ -12,19 +12,27 @@ import { api } from "@/lib/api"
 import { formatCurrency } from "@/lib/utils"
 import { useStore } from "@/store/useStore"
 
+function customTotal(structure: any, kind: "earning" | "deduction") {
+  return (structure.customComponents || [])
+    .filter((c: any) => c.kind === kind)
+    .reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+}
+
 function structureTotals(structure: any) {
   const gross =
     (structure.basic || 0) +
     (structure.hra || 0) +
     (structure.allowances || 0) +
     (structure.incentives || 0) +
-    (structure.bonuses || 0)
+    (structure.bonuses || 0) +
+    customTotal(structure, "earning")
   const deductions =
     (structure.pf || 0) +
     (structure.esi || 0) +
     (structure.professionalTax || 0) +
     (structure.tds || 0) +
-    (structure.otherDeductions || 0)
+    (structure.otherDeductions || 0) +
+    customTotal(structure, "deduction")
   return { gross, deductions, net: gross - deductions }
 }
 
@@ -296,6 +304,12 @@ export default function HRPayrollPage() {
                 <div>HRA: {formatCurrency(payslip.structure?.hra || 0)}</div>
                 <div>Allowances: {formatCurrency(payslip.structure?.allowances || 0)}</div>
                 <div>PF: {formatCurrency(payslip.structure?.pf || 0)}</div>
+                {(payslip.structure?.customComponents || []).map((c: any) => (
+                  <div key={`${c.kind}-${c.name}`}>
+                    {c.name}: {c.kind === "deduction" ? "-" : ""}
+                    {formatCurrency(c.amount || 0)}
+                  </div>
+                ))}
                 <div>
                   Late / leave:{" "}
                   {formatCurrency(

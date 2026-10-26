@@ -25,9 +25,19 @@ import { cn } from "@/lib/utils"
 
 type Status = "present" | "absent" | "late"
 
-type Staff = { entityId: string; name: string }
+type Staff = { entityId: string; name: string; joiningDate?: string; designation?: string }
 
 type Row = Staff & { status: Status }
+
+type StaffType = "trainer" | "bde" | "employee"
+
+const STAFF_TABS: { type: StaffType; label: string; sourceType: string }[] = [
+  { type: "trainer", label: "Trainers", sourceType: "trainer" },
+  { type: "bde", label: "BDEs", sourceType: "bde" },
+  { type: "employee", label: "Other staff", sourceType: "manual" },
+]
+
+const staffLabel = (type: StaffType) => STAFF_TABS.find((t) => t.type === type)?.label || type
 
 type DaySummary = {
   present: number
@@ -83,7 +93,7 @@ export default function HRAttendancePage() {
   const [year, setYear] = React.useState(now.getFullYear())
   const [month, setMonth] = React.useState(now.getMonth() + 1) // 1-12
   const [selectedDate, setSelectedDate] = React.useState(todayIso)
-  const [staffType, setStaffType] = React.useState<"trainer" | "bde">("trainer")
+  const [staffType, setStaffType] = React.useState<StaffType>("trainer")
   const [staff, setStaff] = React.useState<Staff[]>([])
   const [monthRecords, setMonthRecords] = React.useState<any[]>([])
   const [rows, setRows] = React.useState<Row[]>([])
@@ -115,13 +125,16 @@ export default function HRAttendancePage() {
     try {
       setLoading(true)
       const employees = await api.getHREmployees()
+      const sourceType = STAFF_TABS.find((t) => t.type === staffType)?.sourceType
       const active = (employees || []).filter(
-        (e: any) => e.status === "active" && e.sourceType === staffType
+        (e: any) => e.status === "active" && e.sourceType === sourceType
       )
       setStaff(
         active.map((e: any) => ({
           entityId: e.sourceId,
           name: e.name,
+          joiningDate: e.joiningDate ? String(e.joiningDate).slice(0, 10) : undefined,
+          designation: e.designation || undefined,
         }))
       )
 
@@ -162,7 +175,9 @@ export default function HRAttendancePage() {
     )
     const isPast = selectedDate < todayIso()
     setRows(
-      staff.map((s) => {
+      staff
+        .filter((s) => !s.joiningDate || s.joiningDate <= selectedDate)
+        .map((s) => {
         const existing = byId.get(s.entityId)
         const punched =
           Boolean(existing?.loginTime) ||
@@ -235,7 +250,7 @@ export default function HRAttendancePage() {
       setDirty(false)
       addNotification({
         title: "Attendance saved",
-        description: `${formatDisplayDate(selectedDate)} · ${staffType === "trainer" ? "Trainers" : "BDEs"}`,
+        description: `${formatDisplayDate(selectedDate)} · ${staffLabel(staffType)}`,
         type: "system",
       })
     } catch (err: any) {
@@ -276,7 +291,7 @@ export default function HRAttendancePage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-lg border border-border/70 bg-muted/40 p-0.5">
-            {(["trainer", "bde"] as const).map((type) => (
+            {STAFF_TABS.map(({ type, label }) => (
               <button
                 key={type}
                 type="button"
@@ -288,7 +303,7 @@ export default function HRAttendancePage() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {type === "trainer" ? "Trainers" : "BDEs"}
+                {label}
               </button>
             ))}
           </div>
@@ -390,7 +405,7 @@ export default function HRAttendancePage() {
           <CardHeader className="pb-3 border-b border-border/50">
             <CardTitle className="text-sm font-extrabold">{formatDisplayDate(selectedDate)}</CardTitle>
             <CardDescription>
-              {staffType === "trainer" ? "Trainers" : "BDEs"} · {staff.length} active
+              {staffLabel(staffType)} · {rows.length} active
               {selectedSummary
                 ? ` · ${selectedSummary.marked} marked`
                 : " · not marked yet"}
@@ -434,7 +449,14 @@ export default function HRAttendancePage() {
             ) : rows.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
                 <Users className="h-5 w-5 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">No active {staffType}s</p>
+                <p className="text-xs text-muted-foreground">
+                  No active {staffLabel(staffType).toLowerCase()}
+                </p>
+                {staffType === "employee" && (
+                  <Link href="/hr/employees" className="text-[11px] font-semibold text-primary hover:underline">
+                    Add employees in Employees
+                  </Link>
+                )}
               </div>
             ) : (
               <ul className="divide-y divide-border/40 max-h-[28rem] overflow-y-auto">
@@ -454,9 +476,14 @@ export default function HRAttendancePage() {
                       >
                         {initials(row.name) || "?"}
                       </div>
-                      <p className="text-xs font-semibold text-foreground break-words leading-snug">
-                        {row.name}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground break-words leading-snug">
+                          {row.name}
+                        </p>
+                        {row.designation && (
+                          <p className="text-[10px] text-muted-foreground break-words">{row.designation}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="w-full sm:w-[7.5rem] shrink-0">
                       <Select

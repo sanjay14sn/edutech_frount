@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware"
 import { api } from "@/lib/api"
 import { type CenterPolicy, DEFAULT_CENTER_POLICY } from "@/lib/centerPolicyClient"
 
-export type UserRole = "super_admin" | "owner" | "trainer" | "student" | "bde"
+export type UserRole = "super_admin" | "owner" | "trainer" | "student" | "bde" | "employee"
 
 export interface User {
   id: string
@@ -425,6 +425,14 @@ const mockUsers: Record<UserRole, User> = {
     role: "bde",
     tenantId: "t-1",
     avatar: "EW"
+  },
+  employee: {
+    id: "emp-1",
+    name: "Vikram Menon",
+    email: "vikram@apexacademy.com",
+    role: "employee",
+    tenantId: "t-1",
+    avatar: "VM"
   }
 }
 

@@ -9,7 +9,6 @@ import {
   UserCircle,
   BarChart3,
   FileText,
-  CalendarDays,
   Settings,
   type LucideIcon,
 } from "lucide-react"
@@ -33,7 +32,6 @@ export const HR_NAV_ITEMS: HRNavItem[] = [
   { label: "Employee Self-Service", path: "/hr/me", icon: UserCircle },
   { label: "Reports", path: "/hr/reports", icon: BarChart3, adminOnly: true },
   { label: "Documents", path: "/hr/documents", icon: FileText },
-  { label: "Holiday Calendar", path: "/hr/holidays", icon: CalendarDays, adminOnly: true },
   { label: "Settings", path: "/hr/settings", icon: Settings, adminOnly: true },
 ]
 

@@ -1,9 +1,14 @@
-const DEFAULT_BACKEND_API = "https://erpapi.erphubtechnologies.in/api"
+const DEFAULT_BACKEND_API = "http://localhost:5002/api"
 
-/** Browser uses same-origin `/api` (proxied by Next.js). SSR / uploads use full backend URL. */
+/**
+ * Browser always uses same-origin `/api`, which Next rewrites to the backend.
+ * Calling localhost:5002 from the page fails while the API process restarts.
+ * Server-side code still uses the full backend URL.
+ */
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined" ? "/api" : DEFAULT_BACKEND_API)
+  typeof window !== "undefined"
+    ? "/api"
+    : process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_API
 
 export function getBackendOrigin() {
   if (process.env.NEXT_PUBLIC_API_URL) {
@@ -385,6 +390,8 @@ export const api = {
   getHRDashboard: (month?: string) => fetchAPI(`/hr/dashboard${month ? `?month=${month}` : ''}`),
   getHRMe: () => fetchAPI('/hr/me'),
   getHREmployees: () => fetchAPI('/hr/employees'),
+  createHREmployee: (data: any) =>
+    fetchAPI('/hr/employees', { method: 'POST', body: JSON.stringify(data) }),
   updateHREmployee: (id: string, data: any) =>
     fetchAPI(`/hr/employees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   exitHREmployee: (id: string, data: { exitDate?: string; exitReason?: string }) =>
@@ -399,6 +406,8 @@ export const api = {
     fetchAPI('/hr/leave/policy', { method: 'PUT', body: JSON.stringify(data) }),
   getHRLeaveBalances: (year?: number) =>
     fetchAPI(`/hr/leave/balances${year ? `?year=${year}` : ''}`),
+  updateHRLeaveBalance: (id: string, data: { casual: number; sick: number; earned: number }) =>
+    fetchAPI(`/hr/leave/balances/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   getHRLeaveRequests: (params?: { status?: string; employeeId?: string }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
@@ -426,6 +435,48 @@ export const api = {
   updateHRClaimStatus: (id: string, status: string) => fetchAPI(`/hr/claims/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
   assignHRSubstitute: (data: any) => fetchAPI('/hr/substitutes', { method: 'POST', body: JSON.stringify(data) }),
   createHRDocument: (data: any) => fetchAPI('/hr/documents', { method: 'POST', body: JSON.stringify(data) }),
+  updateHRDocumentSharing: (id: string, sharedWithEmployee: boolean) =>
+    fetchAPI(`/hr/documents/${id}`, { method: 'PATCH', body: JSON.stringify({ sharedWithEmployee }) }),
+  deleteHRDocument: (id: string) => fetchAPI(`/hr/documents/${id}`, { method: 'DELETE' }),
+  setHREmployeePortalAccess: (id: string, data: { email?: string; password: string }) =>
+    fetchAPI(`/hr/employees/${id}/portal-access`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Employee portal (staff other than trainers/BDEs)
+  getEmployeeSummary: () => fetchAPI('/employee-portal/summary'),
+  employeeClockIn: (workMode: string) =>
+    fetchAPI('/employee-portal/attendance/clock-in', { method: 'POST', body: JSON.stringify({ workMode }) }),
+  employeeClockOut: () => fetchAPI('/employee-portal/attendance/clock-out', { method: 'POST' }),
+  getEmployeeAttendance: (month?: string) =>
+    fetchAPI(`/employee-portal/attendance${month ? `?month=${month}` : ''}`),
+  requestEmployeeAttendanceCorrection: (data: {
+    date: string
+    requestedLoginTime?: string
+    requestedLogoutTime?: string
+    reason: string
+  }) => fetchAPI('/employee-portal/attendance/corrections', { method: 'POST', body: JSON.stringify(data) }),
+  getEmployeeTasks: () => fetchAPI('/employee-portal/tasks'),
+  createEmployeeTask: (data: { title: string; description?: string; priority?: string; dueDate?: string }) =>
+    fetchAPI('/employee-portal/tasks', { method: 'POST', body: JSON.stringify(data) }),
+  updateEmployeeTask: (id: string, data: { status?: string; remarks?: string }) =>
+    fetchAPI(`/employee-portal/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getEmployeeDailyReports: () => fetchAPI('/employee-portal/daily-reports'),
+  submitEmployeeDailyReport: (data: {
+    date?: string
+    tasksCompleted: string
+    tasksInProgress?: string
+    blockers?: string
+    planForTomorrow?: string
+    hoursWorked: number
+  }) => fetchAPI('/employee-portal/daily-reports', { method: 'POST', body: JSON.stringify(data) }),
+  getEmployeeLeave: () => fetchAPI('/employee-portal/leave'),
+  applyEmployeeLeave: (data: { leaveType: string; startDate: string; endDate: string; reason?: string }) =>
+    fetchAPI('/employee-portal/leave', { method: 'POST', body: JSON.stringify(data) }),
+  cancelEmployeeLeave: (id: string) =>
+    fetchAPI(`/employee-portal/leave/${id}/cancel`, { method: 'PATCH' }),
+  getEmployeeHolidays: (year?: string) =>
+    fetchAPI(`/employee-portal/holidays${year ? `?year=${year}` : ''}`),
+  getEmployeePayslips: () => fetchAPI('/employee-portal/payslips'),
+  getEmployeeDocuments: () => fetchAPI('/employee-portal/documents'),
 
   // Campaigns
   getCampaigns: () => fetchAPI('/campaigns'),
