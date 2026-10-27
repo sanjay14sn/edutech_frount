@@ -1,21 +1,16 @@
-const DEFAULT_BACKEND_API = "http://localhost:5002/api"
+const DEFAULT_BACKEND_API = "https://erpapi.erphubtechnologies.in/api"
 
 /**
- * Browser always uses same-origin `/api`, which Next rewrites to the backend.
- * Calling localhost:5002 from the page fails while the API process restarts.
- * Server-side code still uses the full backend URL.
+ * In browser, uses NEXT_PUBLIC_API_URL if configured, otherwise falls back to same-origin `/api`
+ * which Next.js rewrites to the backend. Server-side code uses NEXT_PUBLIC_API_URL or DEFAULT_BACKEND_API.
  */
 export const API_URL =
-  typeof window !== "undefined"
-    ? "/api"
-    : process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_API
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" ? "/api" : DEFAULT_BACKEND_API)
 
 export function getBackendOrigin() {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, "")
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin
   }
   return DEFAULT_BACKEND_API.replace(/\/api\/?$/, "")
 }
