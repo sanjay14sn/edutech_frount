@@ -1,6 +1,7 @@
 "use client"
-
 import * as React from "react"
+import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import dynamic from "next/dynamic"
@@ -24,7 +25,6 @@ type AuthView = "login" | "forgot"
 export default function LoginPage() {
   const router = useRouter()
   const { login, logout, isAuthenticated } = useStore()
-
   const [view, setView] = React.useState<AuthView>("login")
   const [isLoading, setIsLoading] = React.useState(false)
   const [email, setEmail] = React.useState("")
@@ -116,17 +116,17 @@ export default function LoginPage() {
       </div>
 
       {/* ─── Top Header Navigation ─── */}
-      <header className="relative z-20 w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/10 border border-slate-800">
-            <Sparkles className="h-5 w-5 text-sky-300" />
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="text-xl font-black tracking-tight text-slate-900 leading-none">
-              AI <span className="bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">Edunexis</span>
-            </span>
-          </div>
-        </div>
+      <header className="relative z-20 w-full max-w-7xl mx-auto px-6 py-6 sm:py-8 flex items-center justify-between">
+        <Link href="/" className="inline-flex items-center group">
+          <Image 
+            src="/erplogo.png" 
+            alt="ERP Intellect" 
+            width={260} 
+            height={85} 
+            priority
+            className="h-13 sm:h-15 w-auto object-contain group-hover:opacity-95 transition-opacity" 
+          />
+        </Link>
       </header>
 
 

@@ -1,37 +1,42 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
-import { useStore } from "@/store/useStore"
+import { Navbar } from "@/components/landing/Navbar"
+import { HeroSection } from "@/components/landing/HeroSection"
+import { ProductSuiteSection } from "@/components/landing/ProductSuiteSection"
+import { IndustriesSection } from "@/components/landing/IndustriesSection"
+import { WhyChooseSection } from "@/components/landing/WhyChooseSection"
+import { TestimonialsSection } from "@/components/landing/TestimonialsSection"
+import { CtaSection } from "@/components/landing/CtaSection"
+import { Footer } from "@/components/landing/Footer"
+import { DemoModal } from "@/components/landing/DemoModal"
 
-export default function RootPage() {
-  const router = useRouter()
-  const { isAuthenticated } = useStore()
-  const [mounted, setMounted] = React.useState(false)
-
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  React.useEffect(() => {
-    if (mounted) {
-      if (isAuthenticated) {
-        router.push("/dashboard")
-      } else {
-        router.push("/login")
-      }
-    }
-  }, [mounted, isAuthenticated, router])
+export default function LandingPage() {
+  const [demoModalOpen, setDemoModalOpen] = React.useState(false)
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-3">
-        <svg className="animate-spin h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        <span className="text-xs text-gray-500 font-medium">Loading EduPlatform...</span>
-      </div>
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col selection:bg-cyan-500 selection:text-white">
+      {/* Top Navigation */}
+      <Navbar onOpenDemo={() => setDemoModalOpen(true)} />
+
+      {/* Main Landing Page Sections */}
+      <main className="flex-1">
+        <HeroSection onOpenDemo={() => setDemoModalOpen(true)} />
+        <ProductSuiteSection />
+        <IndustriesSection />
+        <WhyChooseSection />
+        <TestimonialsSection />
+        <CtaSection onOpenDemo={() => setDemoModalOpen(true)} />
+      </main>
+
+      {/* Footer */}
+      <Footer />
+
+      {/* Demo Walkthrough & Booking Modal */}
+      <DemoModal 
+        isOpen={demoModalOpen} 
+        onClose={() => setDemoModalOpen(false)} 
+      />
     </div>
   )
 }

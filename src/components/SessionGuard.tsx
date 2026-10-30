@@ -25,16 +25,20 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = React.useState(false)
 
   React.useEffect(() => {
-    const isAuthPage = pathname.startsWith("/login") || pathname === "/"
+    const isPublicPage =
+      pathname === "/" ||
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/verify") ||
+      pathname.startsWith("/portal")
 
     const verify = async () => {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
 
-      // No token stored → clear state and redirect to login (unless already there)
+      // No token stored → clear state and redirect to login (unless on a public page)
       if (!token) {
         if (isAuthenticated) logout()
         setChecked(true)
-        if (!isAuthPage) router.replace("/login")
+        if (!isPublicPage) router.replace("/login")
         return
       }
 
@@ -51,7 +55,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
             clearAuthSession()
             logout()
             setChecked(true)
-            router.replace("/login")
+            if (!isPublicPage) router.replace("/login")
             return
           }
         }
@@ -80,7 +84,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
         clearAuthSession()
         logout()
         setChecked(true)
-        router.replace("/login")
+        if (!isPublicPage) router.replace("/login")
       }
     }
 

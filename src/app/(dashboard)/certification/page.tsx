@@ -10,6 +10,9 @@ import { useStore } from "@/store/useStore"
 import { api } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { mapBatchToCourseLMS, canStudentAccessCourse, studentNameInBatch } from "@/lib/lms"
+import { generateStudentCertHash, saveCertificateToRegistry, type CertificateModelType } from "@/lib/certificates"
+import { CertificateCanvas } from "@/components/certificate/CertificateCanvas"
+import Link from "next/link"
 
 export default function CertificationPage() {
   const router = useRouter()
@@ -64,6 +67,12 @@ export default function CertificationPage() {
   const certifiedDate = studentBatch?.completedAt
     ? formatDate(studentBatch.completedAt)
     : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
+
+  const certHash = React.useMemo(() => {
+    return generateStudentCertHash(studentName, studentBatch?.code || "Apex-B12")
+  }, [studentName, studentBatch?.code])
+  const [certCopied, setCertCopied] = React.useState(false)
+  const [certModel, setCertModel] = React.useState<CertificateModelType>("classic")
 
   if (loading) {
     return (
@@ -136,64 +145,135 @@ export default function CertificationPage() {
                   ? "Verified certificate of completion for your enrolled course."
                   : "Certificate preview — available once your batch is marked completed."}
               </CardDescription>
+
+              {/* Design Model Selector */}
+              <div className="flex items-center justify-center gap-1.5 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setCertModel("classic")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    certModel === "classic"
+                      ? "bg-amber-500 text-slate-950 shadow-xs"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Model 1: Classic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCertModel("modern")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    certModel === "modern"
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Model 2: Modern
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCertModel("royal")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    certModel === "royal"
+                      ? "bg-blue-900 text-white shadow-xs"
+                      : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Model 3: Royal
+                </button>
+              </div>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div
-                className={`border-8 border-double p-6 rounded-lg bg-card text-center space-y-4 ${
-                  isEligible ? "border-amber-500/30" : "border-border/40 opacity-70"
-                }`}
-              >
-                <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block">
-                  Certificate of Completion
-                </span>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-serif italic text-foreground">{studentName}</h3>
-                  <p className="text-xs text-muted-foreground px-6 leading-relaxed">
-                    has successfully fulfilled all required curriculum, assignments, and evaluations for
-                  </p>
-                  <p className="font-bold text-sm text-foreground">{courseName}</p>
-                </div>
-                <div className="flex justify-between items-end pt-4 text-left border-t border-border/50 text-[10px]">
-                  <div>
-                    <p className="text-muted-foreground">
-                      Certified Date: <strong>{isEligible ? certifiedDate : "Pending"}</strong>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Batch: <strong>{studentBatch.code}</strong>
-                    </p>
-                  </div>
-                  <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 p-1 flex items-center justify-center rounded">
-                    <div className="grid grid-cols-4 gap-0.5 w-full h-full opacity-80">
-                      {Array.from({ length: 16 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`rounded-xs ${i % 3 === 0 || i % 7 === 0 ? "bg-white" : "bg-transparent"}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
+
+            <CardContent className="p-4 sm:p-6 space-y-6 bg-slate-100/50 dark:bg-slate-900/30">
+              <div id="printable-certificate" className="shadow-xl rounded-2xl overflow-hidden">
+                <CertificateCanvas
+                  model={certModel}
+                  studentName={studentName}
+                  courseTitle={courseName}
+                  batchCode={studentBatch.code || "Apex-B12"}
+                  courseCode={studentBatch.code}
+                  certifiedDate={isEligible ? certifiedDate : "Pending"}
+                  hash={certHash}
+                  directorName="Dr. R. K. Vance"
+                  instructorName={studentBatch.trainerName || "Lead Instructor"}
+                  clickableQr={true}
+                />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button
                   variant="outline"
-                  className="text-xs h-9 flex items-center gap-1.5"
+                  className="text-xs h-9 flex items-center gap-1.5 cursor-pointer shadow-xs"
                   disabled={!isEligible}
                   onClick={() => window.print()}
                 >
                   <Download className="h-4 w-4" /> Download PDF Certificate
                 </Button>
+
                 <Button
                   variant="primary"
-                  className="text-xs h-9 flex items-center gap-1.5"
+                  className="text-xs h-9 flex items-center gap-1.5 cursor-pointer shadow-xs"
                   disabled={!isEligible}
-                  onClick={() =>
-                    alert("Verification link copied! Share: " + window.location.origin + "/certification")
-                  }
+                  onClick={() => {
+                    const params = new URLSearchParams({
+                      student: studentName,
+                      course: courseName,
+                      batch: studentBatch.code || "Apex-B12",
+                      instructor: studentBatch.trainerName || "Lead Instructor",
+                      model: certModel
+                    })
+                    const url = `${window.location.origin}/verify/${certHash}?${params.toString()}`
+
+                    saveCertificateToRegistry({
+                      hash: certHash,
+                      certificateId: `CERT-2026-${(studentBatch.code || "BATCH").toUpperCase()}`,
+                      studentName,
+                      courseTitle: courseName,
+                      courseCode: studentBatch.code || "ERP",
+                      batchCode: studentBatch.code || "Apex-B12",
+                      issueDate: isEligible ? certifiedDate : "May 27, 2026",
+                      completionDate: isEligible ? certifiedDate : "May 26, 2026",
+                      status: "verified",
+                      grade: "Distinction with Honors",
+                      scorePercent: 98.4,
+                      instructorName: studentBatch.trainerName || "Lead Instructor",
+                      directorName: "Dr. R. K. Vance",
+                      institutionName: "ERP INTELLECT ACADEMY & ECOSYSTEM",
+                      departmentName: "Center of Excellence & Academic Governance",
+                      accreditation: "ISO/IEC 17024 Academic & Industry Standard",
+                      skills: ["Enterprise Systems", "Curriculum Fulfillment", "Applied Technology"],
+                      credentialUrl: url,
+                      blockchainHash: `0x${certHash.replace(/-/g, "")}7f9a2b8e4c1d6e3f5a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d`,
+                      tamperProofAuditId: `AUD-SEC-${certHash.slice(0, 4).toUpperCase()}`,
+                      criteriaFulfilled: [
+                        "100% Core Video Curricula & Practical Labs Completed",
+                        "Final Capstone Project Evaluation: Grade A+",
+                        "Comprehensive Real-Time Online Coding Evaluation Passed"
+                      ],
+                      preferredModel: certModel
+                    })
+
+                    if (navigator?.clipboard?.writeText) {
+                      navigator.clipboard.writeText(url)
+                    }
+                    setCertCopied(true)
+                    setTimeout(() => setCertCopied(false), 2500)
+                  }}
                 >
-                  <ExternalLink className="h-4 w-4" /> Copy Verification Link
+                  <ExternalLink className="h-4 w-4" /> {certCopied ? "Link Copied!" : "Copy Verification Link"}
                 </Button>
+
+                <Link
+                  href={`/verify/${certHash}?student=${encodeURIComponent(studentName)}&course=${encodeURIComponent(courseName)}&batch=${encodeURIComponent(studentBatch.code || "Apex-B12")}&instructor=${encodeURIComponent(studentBatch.trainerName || "Lead Instructor")}&model=${certModel}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`h-9 text-xs px-3 rounded-lg border border-border/80 bg-card hover:bg-muted/40 hover:border-amber-500/60 hover:text-amber-500 flex items-center justify-center gap-1.5 shadow-2xs font-semibold transition-colors ${
+                    !isEligible ? "pointer-events-none opacity-50" : ""
+                  }`}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Verify Page</span>
+                </Link>
               </div>
 
               {!isEligible && (

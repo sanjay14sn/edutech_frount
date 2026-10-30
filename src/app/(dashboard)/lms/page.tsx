@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
@@ -10,7 +11,8 @@ import {
   ExternalLink, Check, Trash2, Edit2, PlayCircle, Eye, Settings2, 
   Send, Sparkles, Trophy, Star, SendHorizontal, Brain, 
   CheckCheck, RefreshCw, Layers, MapPin,
-  ClipboardCheck, Upload, Users, Shield, Building2, MonitorPlay, LayoutGrid
+  ClipboardCheck, Upload, Users, Shield, Building2, MonitorPlay, LayoutGrid,
+  Printer, Copy, CheckCircle2
 } from "lucide-react"
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/Card"
@@ -56,6 +58,12 @@ import {
   type LmsQuizPack,
 } from "@/lib/lms"
 import { useCenterPolicy } from "@/hooks/useCenterPolicy"
+import {
+  generateStudentCertHash,
+  saveCertificateToRegistry,
+  type CertificateModelType,
+} from "@/lib/certificates"
+import { CertificateCanvas } from "@/components/certificate/CertificateCanvas"
 
 // Mock Initial Data for LMS State
 // CourseLMS interface is moved to useStore.ts
@@ -452,6 +460,112 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
     if (user?.name) return user.name
     return selectedCourse.studentNames?.[0] || ""
   }, [user?.name, selectedCourse.studentNames])
+
+  // Certificate command studio state
+  const [selectedCertStudent, setSelectedCertStudent] = React.useState<string>("")
+  const [certSearchQuery, setCertSearchQuery] = React.useState<string>("")
+  const [generatedCertStudents, setGeneratedCertStudents] = React.useState<Record<string, boolean>>({})
+  const [isGeneratingAllCerts, setIsGeneratingAllCerts] = React.useState(false)
+  const [certCopied, setCertCopied] = React.useState(false)
+  const [certToast, setCertToast] = React.useState<string | null>(null)
+
+  const [certModel, setCertModel] = React.useState<CertificateModelType>("classic")
+
+  const effectiveCertStudent = React.useMemo(() => {
+    if (selectedCertStudent) return selectedCertStudent
+    if (activeRole === "student" && user?.name) return user.name
+    return selectedCourse.studentNames?.[0] || activeStudentName || "Student Name"
+  }, [selectedCertStudent, activeRole, user?.name, selectedCourse.studentNames, activeStudentName])
+
+  const currentCertHash = React.useMemo(() => {
+    return generateStudentCertHash(effectiveCertStudent, selectedCourse?.code || "Apex-B12")
+  }, [effectiveCertStudent, selectedCourse?.code])
+
+  const filteredCertStudents = React.useMemo(() => {
+    const list = selectedCourse?.studentNames || []
+    if (!certSearchQuery.trim()) return list
+    return list.filter(name => name.toLowerCase().includes(certSearchQuery.toLowerCase()))
+  }, [selectedCourse?.studentNames, certSearchQuery])
+
+  const handleGenerateAllCerts = () => {
+    setIsGeneratingAllCerts(true)
+    setTimeout(() => {
+      const all: Record<string, boolean> = {}
+      ;(selectedCourse?.studentNames || []).forEach(name => {
+        all[name] = true
+      })
+      setGeneratedCertStudents(prev => ({ ...prev, ...all }))
+      setIsGeneratingAllCerts(false)
+      setCertToast(`Generated certificates for all ${selectedCourse.studentNames?.length || 0} students!`)
+      setTimeout(() => setCertToast(null), 3500)
+    }, 1200)
+  }
+
+  const handleGenerateSingleCert = (name: string) => {
+    setGeneratedCertStudents(prev => ({ ...prev, [name]: true }))
+    setSelectedCertStudent(name)
+    setCertToast(`Certificate successfully generated for ${name}!`)
+    setTimeout(() => setCertToast(null), 3500)
+  }
+
+  const handleCopyVerificationLink = (hash: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+    const params = new URLSearchParams({
+      student: effectiveCertStudent,
+      course: selectedCourse.title || "Course Program",
+      batch: selectedCourse.code || "Apex-B12",
+      instructor: selectedCourse.trainer || "Head Faculty",
+      model: certModel
+    })
+    const url = `${origin}/verify/${hash}?${params.toString()}`
+
+    saveCertificateToRegistry({
+      hash,
+      certificateId: `CERT-2026-${(selectedCourse.code || "BATCH").toUpperCase()}`,
+      studentName: effectiveCertStudent,
+      courseTitle: selectedCourse.title || "Course Program",
+      courseCode: selectedCourse.code || "ERP",
+      batchCode: selectedCourse.code || "Apex-B12",
+      issueDate: "May 27, 2026",
+      completionDate: "May 26, 2026",
+      status: "verified",
+      grade: "Distinction with Honors",
+      scorePercent: 98.4,
+      instructorName: selectedCourse.trainer || "Head Faculty",
+      directorName: "Dr. R. K. Vance",
+      institutionName: "ERP INTELLECT ACADEMY & ECOSYSTEM",
+      departmentName: "Center of Excellence & Academic Governance",
+      accreditation: "ISO/IEC 17024 Academic & Industry Standard",
+      skills: ["Enterprise Systems", "Curriculum Mastery", "Applied Technology"],
+      credentialUrl: url,
+      blockchainHash: `0x${hash.replace(/-/g, "")}7f9a2b8e4c1d6e3f5a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d`,
+      tamperProofAuditId: `AUD-SEC-${hash.slice(0, 4).toUpperCase()}`,
+      criteriaFulfilled: [
+        "100% Core Video Curricula & Practical Labs Completed",
+        "Final Capstone Project Evaluation: Grade A+",
+        "Comprehensive Real-Time Online Coding Evaluation Passed"
+      ],
+      preferredModel: certModel
+    })
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url)
+    }
+    setCertCopied(true)
+    setCertToast("Verification link copied to clipboard!")
+    setTimeout(() => {
+      setCertCopied(false)
+      setCertToast(null)
+    }, 3000)
+  }
+
+  const handleDownloadCertificate = () => {
+    setCertToast(`Preparing certificate document for ${effectiveCertStudent}...`)
+    setTimeout(() => {
+      window.print()
+      setCertToast(null)
+    }, 600)
+  }
 
   const formatModuleCount = (count: number, singular: string, plural?: string) =>
     `${count} ${count === 1 ? singular : plural ?? `${singular}s`}`
@@ -1924,14 +2038,6 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
                           isSelected ? "ring-1 ring-primary/40 border-primary/50 shadow-xs" : ""
                         }`}
                       >
-                        <div
-                          className={`h-1 ${
-                            course.mode === "offline"
-                              ? "bg-gradient-to-r from-amber-500 to-orange-500"
-                              : "bg-gradient-to-r from-primary via-sky-500 to-cyan-500"
-                          }`}
-                        />
-
                         <CardHeader className="pb-3 space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -2228,7 +2334,6 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
         <TabsContent value="videos" className="space-y-6">
           {(activeRole === "admin" || activeRole === "trainer") && (
             <Card className="overflow-hidden border border-border/80 shadow-sm">
-              <div className="h-1 bg-gradient-to-r from-primary via-sky-500 to-cyan-500" />
               <CardContent className="p-0">
                 <div className="flex flex-col lg:flex-row lg:divide-x divide-border/60">
                   <div className="lg:w-[280px] shrink-0 p-5 bg-muted/20 space-y-3">
@@ -3710,84 +3815,322 @@ export default function LMSPage({ defaultTab }: { defaultTab?: string }) {
 
         {/* ------------------ CERTIFICATE MODULE ------------------ */}
         <TabsContent value="certificates" className="space-y-6">
-          {/* Admin: Generate certificates for all students */}
-          {activeRole === "admin" && (
-            <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 space-y-3">
-              <div className="flex items-center gap-3">
-                <Award className="h-5 w-5 text-yellow-500 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-foreground">Generate Certificates for All Students</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Batch: <strong>{selectedCourse.code}</strong> · {selectedCourse.studentNames.length} enrolled students
-                  </p>
-                </div>
-                <Button variant="primary" className="h-8 text-xs px-4 gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-black border-0 font-bold">
-                  <Award className="h-3.5 w-3.5" /> Generate All
-                </Button>
-              </div>
-              <div className="grid gap-2">
-                {(selectedCourse?.studentNames || []).map((name: string) => (
-                  <div key={name} className="flex items-center justify-between px-3 py-2 rounded-lg border border-border/40 bg-card text-xs">
-                    <span className="font-semibold text-foreground flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      {name}
-                    </span>
-                    <Button variant="outline" className="h-6 text-[10px] px-2.5 gap-1">
-                      <Download className="h-3 w-3" /> Generate
-                    </Button>
-                  </div>
-                ))}
+          {/* Breadcrumb Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setLmsTab("course-home")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/80 bg-card hover:bg-muted/30 text-xs font-semibold text-foreground transition-colors shadow-2xs cursor-pointer"
+              >
+                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                Back to Course Home
+              </button>
+              <span className="text-muted-foreground/60">/</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-foreground">{selectedCourse.title}</span>
+                <Badge variant="outline" className="text-[10px] font-mono">{selectedCourse.code}</Badge>
               </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-500 text-xs font-medium px-2.5 py-1">
+                <Award className="h-3.5 w-3.5 mr-1.5 inline" />
+                Certificate Command Studio
+              </Badge>
+            </div>
+          </div>
+
+          {/* Toast Notification */}
+          {certToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-foreground flex items-center justify-between text-xs font-medium shadow-md"
+            >
+              <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>{certToast}</span>
+              </div>
+              <button onClick={() => setCertToast(null)} className="text-muted-foreground hover:text-foreground text-xs cursor-pointer">
+                ✕
+              </button>
+            </motion.div>
           )}
 
-          <Card className="max-w-2xl mx-auto overflow-hidden">
-            <CardHeader className="border-b border-border/80 text-center">
-              <Award className="h-10 w-10 text-amber-500 mx-auto" />
-              <CardTitle className="text-base font-bold text-foreground mt-2">Verified Course Certificates</CardTitle>
-              <CardDescription className="text-xs">Generated dynamically upon matching all course eligibility rules.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              {/* Certificate Template Preview */}
-              <div className="border-8 border-double border-amber-500/30 p-6 rounded-lg bg-card text-center space-y-4">
-                <span className="text-[10px] font-mono tracking-widest text-amber-500 uppercase block">Certificate of Completion</span>
-                
-                <div className="space-y-2">
-                  <h3 className="text-lg font-serif italic text-foreground">
-                    {activeStudentName || "Student Name"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground px-6 leading-relaxed">
-                    has successfully fulfilled all required curriculum, assignments, and coding evaluations for
-                  </p>
-                  <p className="font-bold text-sm text-foreground">{selectedCourse.title || "Course Title"}</p>
-                </div>
+          {/* 2-Column Split Workspace */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* Left Column: Student Roster & Generation (lg:col-span-5) */}
+            <div className="lg:col-span-5 space-y-4">
+              <Card className="border-border/80 shadow-xs">
+                <CardHeader className="pb-3 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                        <Users className="h-4 w-4 text-primary" />
+                        <span>Student Batch Roster</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Batch: <strong className="text-foreground">{selectedCourse.code}</strong> · {selectedCourse.studentNames?.length || 0} enrolled
+                      </CardDescription>
+                    </div>
 
-                <div className="flex justify-between items-end pt-4 text-left border-t border-border/50 text-[10px]">
-                  <div>
-                    <p className="text-muted-foreground">Certified Date: <strong>May 27, 2026</strong></p>
-                    <p className="text-muted-foreground">Verification Hash: <span className="font-mono text-[9px]">c7f4-8a12-901d</span></p>
+                    {/* Bulk Action */}
+                    {(activeRole === "admin" || activeRole === "trainer") && (
+                      <Button
+                        size="sm"
+                        onClick={handleGenerateAllCerts}
+                        disabled={isGeneratingAllCerts}
+                        className="h-8 text-xs px-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-bold border-0 shadow-sm cursor-pointer"
+                      >
+                        {isGeneratingAllCerts ? (
+                          <>
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                            Issuing...
+                          </>
+                        ) : (
+                          <>
+                            <Award className="h-3.5 w-3.5 mr-1.5" />
+                            Generate All
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
-                  {/* Mock QR verification */}
-                  <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 p-1 flex items-center justify-center rounded">
-                    <div className="grid grid-cols-4 gap-0.5 w-full h-full opacity-80">
-                      {Array.from({ length: 16 }).map((_, i) => (
-                        <div key={i} className={`rounded-xs ${i % 3 === 0 || i % 7 === 0 ? "bg-white" : "bg-transparent"}`} />
-                      ))}
+
+                  {/* Search input */}
+                  <div className="relative mt-3">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Filter student by name..."
+                      value={certSearchQuery}
+                      onChange={(e) => setCertSearchQuery(e.target.value)}
+                      className="h-8 pl-8 text-xs bg-muted/40"
+                    />
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-3 max-h-[500px] overflow-y-auto space-y-2">
+                  {filteredCertStudents.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-xs">
+                      No students found matching "{certSearchQuery}"
+                    </div>
+                  ) : (
+                    filteredCertStudents.map((studentName: string) => {
+                      const isSelected = effectiveCertStudent === studentName
+                      const isIssued = !!generatedCertStudents[studentName]
+                      const initials = studentName
+                        .split(" ")
+                        .map(n => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)
+
+                      return (
+                        <div
+                          key={studentName}
+                          onClick={() => setSelectedCertStudent(studentName)}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-amber-500 bg-amber-500/10 shadow-xs ring-1 ring-amber-500/40"
+                              : "border-border/60 bg-card hover:border-amber-500/40 hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                              isSelected
+                                ? "bg-amber-500 text-black shadow-sm"
+                                : "bg-primary/10 text-primary border border-primary/20"
+                            }`}>
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`text-xs font-semibold truncate ${isSelected ? "text-foreground font-bold" : "text-foreground"}`}>
+                                {studentName}
+                              </p>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
+                                {isIssued ? (
+                                  <span className="inline-flex items-center gap-1 text-emerald-500 font-medium">
+                                    <CheckCircle2 className="h-3 w-3" /> Issued
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-sky-500 font-medium">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                    Eligible
+                                  </span>
+                                )}
+                                <span>• ID: #{studentName.toLowerCase().replace(/\s+/g, "")}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateSingleCert(studentName)}
+                              className={`h-7 px-2.5 text-[11px] gap-1 cursor-pointer font-medium ${
+                                isIssued 
+                                  ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" 
+                                  : "hover:border-amber-500 hover:text-amber-600"
+                              }`}
+                            >
+                              {isIssued ? (
+                                <>
+                                  <Check className="h-3 w-3" /> Re-issue
+                                </>
+                              ) : (
+                                <>
+                                  <Award className="h-3 w-3 text-amber-500" /> Issue
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </CardContent>
+
+                <CardFooter className="p-3 border-t border-border/50 bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between">
+                  <span>Click any student to view credential preview</span>
+                  <span className="font-semibold text-foreground">
+                    {Object.keys(generatedCertStudents).length}/{selectedCourse.studentNames?.length || 0} Issued
+                  </span>
+                </CardFooter>
+              </Card>
+            </div>
+
+            {/* Right Column: Live Certificate Canvas & Controls (lg:col-span-7) */}
+            <div className="lg:col-span-7 space-y-4">
+              <Card className="border-border/80 shadow-md overflow-hidden">
+                <CardHeader className="pb-3 border-b border-border/60 bg-muted/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-amber-500" />
+                        <CardTitle className="text-sm font-bold text-foreground">
+                          Live Certificate Preview
+                        </CardTitle>
+                      </div>
+                      <CardDescription className="text-xs mt-0.5">
+                        Viewing credential for: <strong className="text-foreground">{effectiveCertStudent}</strong>
+                      </CardDescription>
+                    </div>
+
+                    {/* Design Model Selector Pills (3 Distinct Models) */}
+                    <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setCertModel("classic")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          certModel === "classic"
+                            ? "bg-background text-foreground shadow-xs border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Model 1: Classic
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCertModel("modern")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          certModel === "modern"
+                            ? "bg-background text-foreground shadow-xs border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Model 2: Modern
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCertModel("royal")}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          certModel === "royal"
+                            ? "bg-background text-foreground shadow-xs border border-border"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Model 3: Royal
+                      </button>
+                    </div>
+
+                    {/* Preview Actions */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadCertificate}
+                        className="h-8 text-xs gap-1.5 cursor-pointer shadow-2xs hover:bg-amber-500/10 hover:border-amber-500"
+                      >
+                        <Download className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Download PDF</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCopyVerificationLink(currentCertHash)}
+                        className="h-8 text-xs gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        {certCopied ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            <span className="text-emerald-500">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </Button>
+
+                      <Link
+                        href={`/verify/${currentCertHash}?student=${encodeURIComponent(effectiveCertStudent)}&course=${encodeURIComponent(selectedCourse.title || "Course Program")}&batch=${encodeURIComponent(selectedCourse.code || "Apex-B12")}&instructor=${encodeURIComponent(selectedCourse.trainer || "Head Faculty")}&model=${certModel}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-8 text-xs gap-1.5 px-2.5 rounded-lg border border-border/80 bg-card hover:bg-muted/30 hover:border-amber-500/60 hover:text-amber-500 flex items-center shadow-2xs font-medium transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Verify Page</span>
+                      </Link>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.print()}
+                        className="h-8 text-xs gap-1.5 cursor-pointer shadow-2xs hidden sm:flex"
+                      >
+                        <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>Print</span>
+                      </Button>
                     </div>
                   </div>
-                </div>
-              </div>
+                </CardHeader>
 
-              <div className="flex gap-2 justify-center">
-                <Button variant="outline" className="text-xs h-9 flex items-center gap-1.5 cursor-pointer">
-                  <Download className="h-4 w-4" /> Download PDF Certificate
-                </Button>
-                <Button className="text-xs h-9 flex items-center gap-1.5 cursor-pointer" onClick={() => alert("Verification code generated! Copy link: http://localhost:3000/verify/c7f4")}>
-                  <ExternalLink className="h-4 w-4" /> Copy Verification Link
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <CardContent className="p-4 sm:p-6 bg-slate-100/70 dark:bg-slate-900/40 flex items-center justify-center">
+                  <div id="printable-certificate" className="w-full shadow-2xl rounded-2xl overflow-hidden">
+                    <CertificateCanvas
+                      model={certModel}
+                      studentName={effectiveCertStudent}
+                      courseTitle={selectedCourse.title || "Course Program"}
+                      batchCode={selectedCourse.code || "Apex-B12"}
+                      courseCode={selectedCourse.code}
+                      certifiedDate="May 27, 2026"
+                      hash={currentCertHash}
+                      directorName="Dr. R. K. Vance"
+                      instructorName={selectedCourse.trainer || "Head Faculty"}
+                      clickableQr={true}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+          </div>
+
         </TabsContent>
       </Tabs>
 

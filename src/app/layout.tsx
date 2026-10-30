@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduPlatform | Multi-Tenant Education CRM & ERP",
-  description: "Enterprise operations portal for school intakes, course scheduling, attendance loggers, and billing fee ledgers.",
+  title: "ERPIntellect | AI-Powered ERP & CRM Platform",
+  description: "A unified, AI-driven platform for Education, Business and Enterprises — designed to streamline operations, improve productivity and drive sustainable growth.",
   icons: {
     icon: "/favicon.ico",
   }
